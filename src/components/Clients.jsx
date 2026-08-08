@@ -63,7 +63,8 @@ export default function Clients({
   clients = [], 
   currentUserProfile = {}, 
   lang = 'en', 
-  onRefresh 
+  onSaveClient, 
+  onDeleteClient 
 }) {
   const t = localTranslations[lang] || localTranslations.en;
   
@@ -99,17 +100,11 @@ export default function Clients({
 
     try {
       if (editingClient) {
-        await supabase
-          .from('clients')
-          .update({ name: name.trim(), status })
-          .eq('id', editingClient.id);
+        await onSaveClient({ id: editingClient.id, name: name.trim(), status });
       } else {
-        await supabase
-          .from('clients')
-          .insert({ name: name.trim(), status });
+        await onSaveClient({ name: name.trim(), status });
       }
       setIsModalOpen(false);
-      if (onRefresh) onRefresh();
     } catch (err) {
       console.error(err);
       alert("Error saving client details. Name might be duplicate.");
@@ -123,13 +118,13 @@ export default function Clients({
     }
     if (confirm(t.confirmDelete)) {
       try {
-        await supabase.from('clients').delete().eq('id', clientId);
-        if (onRefresh) onRefresh();
+        await onDeleteClient(clientId);
       } catch (err) {
         console.error(err);
       }
     }
   };
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="animate-fade-in">
