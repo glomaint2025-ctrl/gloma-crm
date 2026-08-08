@@ -8,6 +8,8 @@ import TaskTracker from './components/TaskTracker';
 import ContentCalendar from './components/ContentCalendar';
 import DailyUpdates from './components/DailyUpdates';
 import DeliveredWork from './components/DeliveredWork';
+import TeamMembers from './components/TeamMembers';
+import ManageRoles from './components/ManageRoles';
 import SetupSettings from './components/SetupSettings';
 
 import { 
@@ -21,6 +23,7 @@ import {
   User,
   Users,
   Calendar,
+  Shield,
   ShieldAlert
 } from 'lucide-react';
 
@@ -32,6 +35,8 @@ const sidebarTranslations = {
     calendar: "Content Calendar",
     updates: "EOD Updates",
     deliveries: "Final Deliveries",
+    team: "Team Members",
+    roles: "Manage Roles",
     settings: "System Settings",
     signOut: "Sign Out",
     offlineSandbox: "Offline Sandbox: Synced to local browser. Add Supabase keys to .env to connect."
@@ -43,6 +48,8 @@ const sidebarTranslations = {
     calendar: "දින දර්ශනය",
     updates: "EOD යාවත්කාලීන",
     deliveries: "භාරදීම්",
+    team: "කණ්ඩායම් සාමාජිකයින්",
+    roles: "අවසර කළමනාකරණය",
     settings: "පද්ධති සැකසුම්",
     signOut: "පද්ධතියෙන් ඉවත් වන්න",
     offlineSandbox: "නොබැඳි Sandbox: බ්‍රව්සරයට සුරැකේ. සජීවී Supabase සඳහා .env යාවත්කාලීන කරන්න."
@@ -54,6 +61,8 @@ const sidebarTranslations = {
     calendar: "உள்ளடக்க காலெண்டர்",
     updates: "தினசரி புதுப்பிப்புகள்",
     deliveries: "இறுதி வழங்கல்கள்",
+    team: "குழு உறுப்பினர்கள்",
+    roles: "பாத்திர நிர்வாகம்",
     settings: "அமைப்புகள்",
     signOut: "வெளியேறு",
     offlineSandbox: "ஆஃப்லைன் சாண்ட்பாக்ஸ்: உலாவியில் சேமிக்கப்பட்டது. சජீவ Supabase ஐ இணைக்க .env ஐ திருத்தவும்."
@@ -562,8 +571,26 @@ export default function App() {
             <FileCheck size={18} /> {sbT.deliveries}
           </button>
 
-          <button 
-            onClick={() => setActiveView('settings')} 
+          {/* Team directory: visible to ALL team members */}
+          <button
+            onClick={() => setActiveView('team')}
+            className={`nav-btn ${activeView === 'team' ? 'active' : ''}`}
+          >
+            <Users size={18} /> {sbT.team}
+          </button>
+
+          {/* Manage Roles: Admin + Developer only */}
+          {(currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Developer') && (
+            <button
+              onClick={() => setActiveView('roles')}
+              className={`nav-btn ${activeView === 'roles' ? 'active' : ''}`}
+            >
+              <Shield size={18} /> {sbT.roles}
+            </button>
+          )}
+
+          <button
+            onClick={() => setActiveView('settings')}
             className={`nav-btn ${activeView === 'settings' ? 'active' : ''}`}
           >
             <Settings size={18} /> {sbT.settings}
@@ -672,8 +699,27 @@ export default function App() {
           />
         )}
 
+        {activeView === 'team' && (
+          <TeamMembers
+            profiles={profiles}
+            currentUserProfile={currentUserProfile}
+            lang={lang}
+          />
+        )}
+
+        {activeView === 'roles' && (
+          <ManageRoles
+            profiles={profiles}
+            currentUserProfile={currentUserProfile}
+            onUpdateProfileRole={handleUpdateProfileRole}
+            onUpdateProfileDetails={handleUpdateProfileDetails}
+            onCreateMemberAccount={handleCreateMemberAccount}
+            lang={lang}
+          />
+        )}
+
         {activeView === 'settings' && (
-          <SetupSettings 
+          <SetupSettings
             profiles={profiles} 
             currentUserProfile={currentUserProfile}
             globalSettings={globalSettings}

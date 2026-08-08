@@ -10,10 +10,7 @@ import {
   FileSpreadsheet,
   Palette,
   Type,
-  Globe,
-  Users,
-  UserPlus,
-  Key
+  Globe
 } from 'lucide-react';
 import { isUsingMock } from '../supabaseClient';
 
@@ -144,18 +141,6 @@ export default function SetupSettings({
   const [profileMsg, setProfileMsg] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // New member account registration states
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberPassword, setNewMemberPassword] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState('Employee');
-  const [newMemberMsg, setNewMemberMsg] = useState({ text: '', type: '' });
-  const [isCreatingMember, setIsCreatingMember] = useState(false);
-
-  // Password editing states for Developer
-  const [editingUserId, setEditingUserId] = useState(null);
-  const [editingUserPassword, setEditingUserPassword] = useState('');
-
   React.useEffect(() => {
     if (currentUserProfile) {
       setProfileName(currentUserProfile.full_name || '');
@@ -229,111 +214,16 @@ export default function SetupSettings({
     reader.readAsDataURL(file);
   };
 
-  const handleCreateMemberSubmit = async (e) => {
-    e.preventDefault();
-    if (!newMemberEmail || !newMemberName || !newMemberPassword) {
-      setNewMemberMsg({ text: 'Please fill out all fields.', type: 'error' });
-      return;
-    }
-    if (newMemberPassword.length < 6) {
-      setNewMemberMsg({ text: 'Password must be at least 6 characters long.', type: 'error' });
-      return;
-    }
-    
-    setIsCreatingMember(true);
-    setNewMemberMsg({ text: '', type: '' });
-    
-    if (onCreateMemberAccount) {
-      const res = await onCreateMemberAccount({
-        email: newMemberEmail,
-        fullName: newMemberName,
-        password: newMemberPassword,
-        role: newMemberRole
-      });
-      if (res && res.success) {
-        setNewMemberMsg({ text: 'Account created and profile initialized successfully!', type: 'success' });
-        setNewMemberEmail('');
-        setNewMemberName('');
-        setNewMemberPassword('');
-        setNewMemberRole('Employee');
-      } else {
-        setNewMemberMsg({ text: `Creation failed: ${res?.error || 'Unknown error code'}`, type: 'error' });
-      }
-    } else {
-      setNewMemberMsg({ text: 'Account creator callback function not verified.', type: 'error' });
-    }
-    setIsCreatingMember(false);
-  };
-
   const userRole = currentUserProfile?.role || 'Employee';
   const isDev = userRole === 'Developer';
   const isAdmin = userRole === 'Admin';
   const isAdminOrDev = isDev || isAdmin;
-
-  // Full list available to Developer only
-  const allRolesList = [
-    { value: 'Employee', label: 'Employee (Logs only)' },
-    { value: 'Editor', label: 'Editor' },
-    { value: 'Social Media Executive', label: 'Social Media Executive' },
-    { value: 'SMM & Developer', label: 'SMM & Developer' },
-    { value: 'Accountant', label: 'Accountant' },
-    { value: 'Coordinator', label: 'Coordinator' },
-    { value: 'Marketing Executive', label: 'Marketing Executive' },
-    { value: 'Manager', label: 'Manager' },
-    { value: 'Admin', label: 'Admin' },
-    { value: 'Developer', label: 'Developer' }
-  ];
-
-  // Admin restricted list: no Developer option
-  const adminRolesList = [
-    { value: 'Employee', label: 'Employee (Logs only)' },
-    { value: 'Editor', label: 'Editor' },
-    { value: 'Social Media Executive', label: 'Social Media Executive' },
-    { value: 'SMM & Developer', label: 'SMM & Developer' },
-    { value: 'Accountant', label: 'Accountant' },
-    { value: 'Coordinator', label: 'Coordinator' },
-    { value: 'Marketing Executive', label: 'Marketing Executive' },
-    { value: 'Manager', label: 'Manager' },
-    { value: 'Admin', label: 'Admin' }
-  ];
-
-  const getSelectableRoles = (currentRole) => {
-    let list = [];
-    if (isDev) {
-      list = [...allRolesList];
-    } else if (isAdmin) {
-      list = [...adminRolesList];
-    }
-    if (!list.some(r => r.value === currentRole)) {
-      list.unshift({ value: currentRole, label: currentRole });
-    }
-    return list;
-  };
-
-  // Filter profiles: hide Developer from non-Developer users
-  const visibleProfiles = profiles.filter(p => {
-    if (isDev) return true;
-    return p.role !== 'Developer';
-  });
 
   const driveWorkspace = {
     rootName: "Gloma International \u2013 Team Work Tracker Workspace",
     rootLink: "https://drive.google.com/open?id=1gvnXgvKWVV_SfsrSCIj5jeO1ysO_uI8k",
     devinWorks: "https://drive.google.com/open?id=1ntEUrorN4r3IzAU_G-aaSIGOpVbexE8T",
     bishwaWorks: "https://drive.google.com/open?id=1VJZjDb4lzJhJ5GPb9ygyZpevEd8fZJ94"
-  };
-
-  const handleRoleChange = (profileId, newRole) => {
-    if (!isAdminOrDev) {
-      alert('Only Admins or Developers can manage security roles.');
-      return;
-    }
-    if (isAdmin && newRole === 'Developer') {
-      alert('Admin accounts cannot assign the Developer role.');
-      return;
-    }
-    onUpdateProfileRole(profileId, newRole);
-    alert(t.confirmRoleUpdate);
   };
 
   const handleSaveDevPrefs = (e) => {
@@ -469,11 +359,7 @@ export default function SetupSettings({
           
           {isAdminOrDev && renderMenuItem('excel', <Upload size={16} />, t.menuExcel)}
 
-          {/* Team tab: visible to Developer + Admin */}
-          {isAdminOrDev && renderMenuItem('team', <Users size={16} />, t.menuTeam)}
-
-          {/* Roles tab: visible to Developer + Admin */}
-          {isAdminOrDev && renderMenuItem('roles', <Shield size={16} />, t.menuRoles)}
+          {/* Team Members & Manage Roles moved to the main left sidebar (TeamMembers.jsx / ManageRoles.jsx) */}
 
           {/* Developer Preferences: visible only to Developer */}
           {isDev && renderMenuItem('devprefs', <Settings size={16} />, t.menuDevConsole)}
@@ -705,254 +591,6 @@ export default function SetupSettings({
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* TEAM MEMBERS view (read-only directory) */}
-          {activeTab === 'team' && (
-            <div>
-              <h3 style={styles.tabTitle}>{t.titleTeam}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 16 }}>
-                Overview of all registered team members and their current roles.
-              </p>
-              
-              <div style={styles.teamGrid}>
-                {visibleProfiles.map((p) => (
-                  <div key={p.id} style={styles.teamCard} className="glass-card-interactive">
-                    <img 
-                      src={p.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${p.full_name}`} 
-                      alt="" 
-                      style={styles.teamAvatar} 
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '600', fontSize: 'var(--font-size-md)' }}>{p.full_name}</div>
-                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: 2 }}>{p.email}</div>
-                    </div>
-                    <div style={styles.roleTag(p.role)}>
-                      <Shield size={10} /> {p.role}
-                    </div>
-                  </div>
-                ))}
-                {visibleProfiles.length === 0 && (
-                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No team members registered yet.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ROLES ASSIGNMENT view (Admin + Developer) */}
-          {activeTab === 'roles' && isAdminOrDev && (
-            <div>
-              <h3 style={styles.tabTitle}>{t.titleRoles}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 16 }}>
-                Assign authority levels and credentials to team members.
-                {isAdmin && ' Developer accounts are restricted and hidden from this view.'}
-              </p>
-
-              {/* Add New Member Account Form */}
-              <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h4 style={{ fontSize: 'var(--font-size-md)', color: 'var(--color-gold)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                  <UserPlus size={18} /> Add New Team Member Account
-                </h4>
-                
-                <form onSubmit={handleCreateMemberSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                      Full Name
-                    </label>
-                    <input 
-                      type="text" 
-                      value={newMemberName} 
-                      onChange={(e) => setNewMemberName(e.target.value)} 
-                      className="form-input" 
-                      placeholder="e.g. John Doe"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                      Email Address
-                    </label>
-                    <input 
-                      type="email" 
-                      value={newMemberEmail} 
-                      onChange={(e) => setNewMemberEmail(e.target.value)} 
-                      className="form-input" 
-                      placeholder="e.g. member@gloma.com"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                      Login Password
-                    </label>
-                    <input 
-                      type="password" 
-                      value={newMemberPassword} 
-                      onChange={(e) => setNewMemberPassword(e.target.value)} 
-                      className="form-input" 
-                      placeholder="At least 6 characters"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                      Assign Security Role
-                    </label>
-                    <select 
-                      value={newMemberRole} 
-                      onChange={(e) => setNewMemberRole(e.target.value)} 
-                      className="form-input"
-                    >
-                      {getSelectableRoles('Employee').filter(r => isDev || r.value !== 'Developer').map((r) => (
-                        <option key={r.value} value={r.value}>{r.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-                    <div>
-                      {newMemberMsg.text && (
-                        <span style={{ 
-                          fontSize: 'var(--font-size-sm)', 
-                          fontWeight: '600', 
-                          color: newMemberMsg.type === 'success' ? '#10b981' : '#ef4444' 
-                        }}>
-                          {newMemberMsg.text}
-                        </span>
-                      )}
-                    </div>
-                    <button type="submit" className="btn-primary" disabled={isCreatingMember}>
-                      {isCreatingMember ? 'Creating Account...' : 'Create Account'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              <div className="table-container" style={{ border: 'none' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Profile Member</th>
-                      <th>Email ID</th>
-                      <th>Current Role</th>
-                      <th>Assign Role Authority</th>
-                      {isDev && <th>Security Password</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleProfiles.map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <img 
-                              src={p.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${p.full_name}`} 
-                              alt="" 
-                              style={{ width: 30, height: 30, borderRadius: 'var(--radius-full)', border: '2px solid var(--border-subtle)' }} 
-                            />
-                            <span style={{ fontWeight: '600' }}>{p.full_name}</span>
-                          </div>
-                        </td>
-                        <td style={{ color: 'var(--color-text-secondary)' }}>{p.email}</td>
-                        <td>
-                          <div style={styles.roleTag(p.role)}>
-                            <Shield size={10} /> {p.role}
-                          </div>
-                        </td>
-                        <td>
-                          {p.id === currentUserProfile.id ? (
-                            <span style={{ fontWeight: 'bold', color: 'var(--color-gold)', fontSize: 'var(--font-size-sm)' }}>
-                              (Your Account)
-                            </span>
-                          ) : (
-                            <select
-                              value={p.role}
-                              onChange={(e) => handleRoleChange(p.id, e.target.value)}
-                              style={styles.roleSelect}
-                            >
-                              {getSelectableRoles(p.role).map((roleOpt) => (
-                                <option key={roleOpt.value} value={roleOpt.value}>
-                                  {roleOpt.label}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
-                        {isDev && (
-                          <td>
-                            {editingUserId === p.id ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <input 
-                                  type="text" 
-                                  value={editingUserPassword}
-                                  onChange={(e) => setEditingUserPassword(e.target.value)}
-                                  className="form-input"
-                                  style={{ width: '130px', padding: '4px 8px', fontSize: 'var(--font-size-sm)' }}
-                                />
-                                <button 
-                                  onClick={async () => {
-                                    if (!editingUserPassword.trim() || editingUserPassword.length < 6) {
-                                      alert('Password must be at least 6 characters.');
-                                      return;
-                                    }
-                                    const res = await onUpdateProfileDetails(p.id, { password: editingUserPassword });
-                                    if (res && res.success) {
-                                      alert('Password updated successfully!');
-                                      setEditingUserId(null);
-                                    } else {
-                                      alert(`Failed to save: ${res?.error || 'Unknown error'}`);
-                                    }
-                                  }}
-                                  className="btn-primary"
-                                  style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }}
-                                >
-                                  Save
-                                </button>
-                                <button 
-                                  onClick={() => setEditingUserId(null)}
-                                  className="btn-secondary"
-                                  style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <code style={{ 
-                                  backgroundColor: 'rgba(212, 175, 55, 0.1)', 
-                                  padding: '3px 6px', 
-                                  borderRadius: '4px',
-                                  fontFamily: 'monospace',
-                                  color: 'var(--color-gold)',
-                                  fontSize: 'var(--font-size-sm)',
-                                  border: '1px solid rgba(212, 175, 55, 0.2)'
-                                }}>
-                                  {p.password || 'password123'}
-                                </code>
-                                <button 
-                                  onClick={() => {
-                                    setEditingUserId(p.id);
-                                    setEditingUserPassword(p.password || 'password123');
-                                  }}
-                                  className="btn-secondary"
-                                  style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-xs)' }}
-                                >
-                                  Change
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
           )}
 
