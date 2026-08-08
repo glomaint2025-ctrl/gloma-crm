@@ -116,6 +116,17 @@ User request: make the UI fully responsive for any device/mobile phone.
   2. If real auth emails are wanted later (password reset, etc.), connect a **custom SMTP** under Authentication → Settings → SMTP Settings (e.g. Resend, SendGrid, Postmark) instead of relying on Supabase's default sender.
 * **Status**: ⚠️ Explained to user; **not yet toggled in the Supabase dashboard** — this cannot be done from the codebase/CLI, only from the Supabase project's web dashboard by someone with access.
 
+### Problem 8 — Add an online/last-seen presence feature, Developer-only
+
+User request (Sinhala): "kauda online and last seen danna welawa... developerta witharak balanna puluwan feature ekak danna" — show who's online right now and when each person was last seen, visible only to the Developer role.
+
+* **New column**: [`src/components/ManageRoles.jsx`](src/components/ManageRoles.jsx) — added a "Presence" column to the role-assignment table, gated by the existing `isDev` flag (same pattern as the Security Password column), showing a green pulsing dot + "Online now" / "Xm ago" / "Xh ago" / "Xd ago" / "Never logged in" per member. `ONLINE_THRESHOLD_MS` = 2 minutes.
+* **Heartbeat**: [`src/App.jsx`](src/App.jsx) — new `useEffect` keyed on `currentUserProfile?.id` writes `profiles.last_seen = now()` immediately on login and every 60s while the app stays open, for **every** logged-in user (not just Developer) so everyone's presence data accumulates.
+* **Live-ish updates while viewing the page**: `ManageRoles.jsx` polls `onRefreshProfiles` (passed down from `App.jsx`'s existing `refreshData`) every 20s, but only when `isDev` — so only the Developer's Manage Roles view pays the cost of the extra polling.
+* **DB migration**: `supabase_add_last_seen.sql` — adds `profiles.last_seen timestamptz`, same `IF NOT EXISTS` + `notify pgrst, 'reload schema'` pattern as the other migration files. **Must be run in the Supabase SQL Editor** before this feature works on the live site — until then, `last_seen` writes will fail silently the same way the earlier "language column" error did (Problem 1), since the live `profiles` table doesn't have this column yet.
+* **Verified** in local mock mode: simulated three other users' `last_seen` (30s ago → "Online now", 3h ago → "3h ago", never set → "Never logged in") and confirmed the Developer view renders all four states correctly; confirmed Admin sees the Manage Roles table with **no** Presence or Security Password column (both still Developer-only).
+* **Status**: ✅ Code done, committed, pushed. ⚠️ **SQL migration not yet run** — see Next steps.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
@@ -133,11 +144,12 @@ Cloud-session git operations on the mounted folder repeatedly leave `.git/*.lock
 
 ## 5. Next steps / open items
 
-1. **Disable "Confirm email" in the Supabase dashboard** (Authentication → Providers → Email) — see Problem 7. This is the top open item; it's blocking reliable team-member account creation and can only be done by someone with Supabase dashboard access, not from this repo.
-2. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
-3. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
-4. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
-5. Optional: consider whether `supabase_fix_profiles.sql` / `supabase_fix_team_visibility.sql` should be moved into a `supabase/migrations/` folder for cleanliness now that there are three SQL files in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
+1. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
+2. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
+3. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
+4. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
+5. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
+6. Optional: consider whether the four `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
 
 ## 6. Template prompt for a new AI chat
 

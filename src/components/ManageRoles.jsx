@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, UserPlus, Lock } from 'lucide-react';
+
+const ONLINE_THRESHOLD_MS = 2 * 60 * 1000; // must stay in sync with the ~60s heartbeat in App.jsx
 
 const localTranslations = {
   en: {
@@ -8,7 +10,12 @@ const localTranslations = {
     adminNote: " Developer accounts are restricted and hidden from this view.",
     confirmRoleUpdate: "User role changed successfully!",
     noAccess: "Only Admin or Developer accounts can manage security roles.",
-    addMemberTitle: "Add New Team Member Account"
+    addMemberTitle: "Add New Team Member Account",
+    lastSeenCol: "Presence",
+    onlineLabel: "Online now",
+    offlineLabel: "Offline",
+    neverLabel: "Never logged in",
+    agoSuffix: "ago"
   },
   si: {
     title: "අවසර මට්ටම් කළමනාකරණය",
@@ -16,7 +23,12 @@ const localTranslations = {
     adminNote: " Developer ගිණුම් මෙම පිටුවෙන් සඟවා ඇත.",
     confirmRoleUpdate: "සේවක අවසර තත්වය වෙනස් කරන ලදී!",
     noAccess: "අවසර මට්ටම් වෙනස් කළ හැක්කේ Admin හෝ Developer ගිණුම් වලට පමණි.",
-    addMemberTitle: "නව කණ්ඩායම් සාමාජික ගිණුමක් එක් කරන්න"
+    addMemberTitle: "නව කණ්ඩායම් සාමාජික ගිණුමක් එක් කරන්න",
+    lastSeenCol: "සබැඳි තත්වය",
+    onlineLabel: "දැන් සබැඳිව",
+    offlineLabel: "විසන්ධිව",
+    neverLabel: "කිසිදා login වී නැත",
+    agoSuffix: "පෙර"
   },
   ta: {
     title: "பாத்திர நிர்வாகம்",
@@ -24,7 +36,12 @@ const localTranslations = {
     adminNote: " டெவலப்பர் கணக்குகள் இந்தப் பக்கத்தில் மறைக்கப்பட்டுள்ளன.",
     confirmRoleUpdate: "அனுமதி நிலை மாற்றப்பட்டது!",
     noAccess: "நிர்வாகி அல்லது டெவலப்பர் கணக்குகள் மட்டுமே பாத்திரங்களை நிர்வகிக்க முடியும்.",
-    addMemberTitle: "புதிய குழு உறுப்பினர் கணக்கைச் சேர்க்கவும்"
+    addMemberTitle: "புதிய குழு உறுப்பினர் கணக்கைச் சேர்க்கவும்",
+    lastSeenCol: "இணைப்பு நிலை",
+    onlineLabel: "தற்போது ஆன்லைனில்",
+    offlineLabel: "ஆஃப்லைன்",
+    neverLabel: "இதுவரை உள்நுழையவில்லை",
+    agoSuffix: "முன்பு"
   }
 };
 
@@ -34,6 +51,7 @@ export default function ManageRoles({
   onUpdateProfileRole,
   onUpdateProfileDetails,
   onCreateMemberAccount,
+  onRefreshProfiles,
   lang = 'en'
 }) {
   const t = localTranslations[lang] || localTranslations.en;
@@ -42,6 +60,27 @@ export default function ManageRoles({
   const isDev = userRole === 'Developer';
   const isAdmin = userRole === 'Admin';
   const isAdminOrDev = isDev || isAdmin;
+
+  // Developer-only presence: poll for fresh last_seen values while this page is open
+  useEffect(() => {
+    if (!isDev || !onRefreshProfiles) return;
+    const interval = setInterval(onRefreshProfiles, 20000);
+    return () => clearInterval(interval);
+  }, [isDev, onRefreshProfiles]);
+
+  const isOnline = (lastSeen) => !!lastSeen && (Date.now() - new Date(lastSeen).getTime()) < ONLINE_THRESHOLD_MS;
+
+  const formatLastSeen = (lastSeen) => {
+    if (!lastSeen) return t.neverLabel;
+    if (isOnline(lastSeen)) return t.onlineLabel;
+    const diffMs = Date.now() - new Date(lastSeen).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 60) return `${mins}m ${t.agoSuffix}`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ${t.agoSuffix}`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ${t.agoSuffix}`;
+  };
 
   // New member account registration states
   const [newMemberEmail, setNewMemberEmail] = useState('');
@@ -243,6 +282,7 @@ export default function ManageRoles({
                 <th>Profile Member</th>
                 <th>Email ID</th>
                 <th>Current Role</th>
+                {isDev && <th>{t.lastSeenCol}</th>}
                 <th>Assign Role Authority</th>
                 {isDev && <th>Security Password</th>}
               </tr>
@@ -266,6 +306,23 @@ export default function ManageRoles({
                       <Shield size={10} /> {p.role}
                     </div>
                   </td>
+                  {isDev && (
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-sm)' }}>
+                        <span style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          flexShrink: 0,
+                          backgroundColor: isOnline(p.last_seen) ? '#10B981' : 'var(--color-text-muted)',
+                          boxShadow: isOnline(p.last_seen) ? '0 0 6px #10B981' : 'none'
+                        }} />
+                        <span style={{ color: isOnline(p.last_seen) ? '#10B981' : 'var(--color-text-secondary)', fontWeight: isOnline(p.last_seen) ? '600' : '400' }}>
+                          {formatLastSeen(p.last_seen)}
+                        </span>
+                      </div>
+                    </td>
+                  )}
                   <td>
                     {p.id === currentUserProfile.id ? (
                       <span style={{ fontWeight: 'bold', color: 'var(--color-gold)', fontSize: 'var(--font-size-sm)' }}>
@@ -354,7 +411,7 @@ export default function ManageRoles({
               ))}
               {visibleProfiles.length === 0 && (
                 <tr>
-                  <td colSpan={isDev ? 5 : 4} style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={isDev ? 6 : 4} style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     No team members registered yet.
                   </td>
                 </tr>

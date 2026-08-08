@@ -110,6 +110,27 @@ export default function App() {
     initAuth();
   }, []);
 
+  // Presence heartbeat: keep this user's last_seen fresh while the app is open
+  // (used by the Developer-only Online/Last Seen column in Manage Roles).
+  useEffect(() => {
+    if (!currentUserProfile?.id) return;
+
+    const beat = async () => {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('id', currentUserProfile.id);
+      } catch (err) {
+        console.error('Presence heartbeat failed:', err);
+      }
+    };
+
+    beat();
+    const interval = setInterval(beat, 60000);
+    return () => clearInterval(interval);
+  }, [currentUserProfile?.id]);
+
   const applyVisualSettings = (settings) => {
     if (!settings) return;
     
@@ -742,6 +763,7 @@ export default function App() {
             onUpdateProfileRole={handleUpdateProfileRole}
             onUpdateProfileDetails={handleUpdateProfileDetails}
             onCreateMemberAccount={handleCreateMemberAccount}
+            onRefreshProfiles={refreshData}
             lang={lang}
           />
         )}
