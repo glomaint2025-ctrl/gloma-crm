@@ -56,11 +56,7 @@ export default function Login({ onAuthSuccess }) {
       <div style={styles.backgroundGlow}></div>
       <div className="glass-panel" style={styles.card}>
         <div style={styles.logoHeader}>
-          {/* Stylized Logo Icon in CSS */}
-          <div style={styles.logoIcon}>
-            <div style={styles.logoBluePrism}></div>
-            <div style={styles.logoGoldPrism}></div>
-          </div>
+          <img src="/logo.png" alt="Gloma Logo" style={styles.logoImage} />
           <h1 style={styles.logoText}>GLOMA</h1>
           <span style={styles.logoSubtext}>INTERNATIONAL</span>
         </div>
@@ -230,31 +226,11 @@ const styles = {
     alignItems: 'center',
     marginBottom: '28px'
   },
-  logoIcon: {
-    display: 'flex',
-    position: 'relative',
-    width: '60px',
-    height: '60px',
+  logoImage: {
+    width: '64px',
+    height: '64px',
+    objectFit: 'contain',
     marginBottom: '10px'
-  },
-  logoBluePrism: {
-    position: 'absolute',
-    top: 5,
-    left: 5,
-    width: '35px',
-    height: '50px',
-    backgroundColor: '#0c1a30',
-    clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-    border: '1px solid rgba(255,255,255,0.1)'
-  },
-  logoGoldPrism: {
-    position: 'absolute',
-    top: 15,
-    left: 25,
-    width: '30px',
-    height: '40px',
-    backgroundColor: '#D4AF37',
-    clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)'
   },
   logoText: {
     fontFamily: 'var(--font-heading)',
