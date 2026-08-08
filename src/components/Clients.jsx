@@ -128,7 +128,7 @@ export default function Clients({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="animate-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <h2>{t.title}</h2>
         {canManage && (
           <button onClick={() => openModal(null)} className="btn-primary">
@@ -257,14 +257,17 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
-    backdropFilter: 'blur(4px)'
+    backdropFilter: 'blur(4px)',
+    padding: '16px'
   },
   modalContent: {
     width: '100%',
     maxWidth: '450px',
-    padding: '24px',
+    padding: 'clamp(16px, 4vw, 24px)',
     backgroundColor: 'var(--bg-panel)',
-    border: '1px solid var(--border-glass)'
+    border: '1px solid var(--border-glass)',
+    maxHeight: '90vh',
+    overflowY: 'auto'
   },
   modalHeader: {
     display: 'flex',

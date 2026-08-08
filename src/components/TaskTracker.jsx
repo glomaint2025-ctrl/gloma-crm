@@ -1097,12 +1097,13 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
-    backdropFilter: 'blur(4px)'
+    backdropFilter: 'blur(4px)',
+    padding: '16px'
   },
   modalContent: {
     width: '100%',
     maxWidth: '560px',
-    padding: '24px',
+    padding: 'clamp(16px, 4vw, 24px)',
     backgroundColor: 'var(--bg-panel)',
     borderColor: 'var(--border-glass)',
     overflowY: 'auto',
@@ -1128,7 +1129,8 @@ const styles = {
   },
   formRow: {
     display: 'flex',
-    gap: '12px'
+    gap: '12px',
+    flexWrap: 'wrap'
   },
   modalLabel: {
     display: 'block',

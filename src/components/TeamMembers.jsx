@@ -116,7 +116,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: '16px'
+    gap: '16px',
+    flexWrap: 'wrap'
   },
   pageTitle: {
     display: 'flex',

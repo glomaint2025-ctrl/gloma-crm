@@ -165,7 +165,7 @@ export default function ManageRoles({
           <UserPlus size={18} /> {t.addMemberTitle}
         </h4>
 
-        <form onSubmit={handleCreateMemberSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <form onSubmit={handleCreateMemberSubmit} className="grid-2col-1-1">
           <div>
             <label style={styles.fieldLabel}>Full Name</label>
             <input

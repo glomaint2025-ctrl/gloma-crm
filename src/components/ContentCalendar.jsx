@@ -297,16 +297,19 @@ export default function ContentCalendar({
         </div>
       </div>
 
-      {/* Week Header */}
-      <div style={styles.weekGrid}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-          <div key={d} style={styles.weekLabel}>{d}</div>
-        ))}
-      </div>
+      {/* Week Header + Calendar Grid (horizontally scrollable on narrow screens) */}
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ minWidth: '640px' }}>
+          <div style={styles.weekGrid}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+              <div key={d} style={styles.weekLabel}>{d}</div>
+            ))}
+          </div>
 
-      {/* Calendar Grid */}
-      <div style={styles.calendarGrid}>
-        {calendarCells}
+          <div style={styles.calendarGrid}>
+            {calendarCells}
+          </div>
+        </div>
       </div>
 
       {/* Quick Add Modal */}
@@ -542,14 +545,17 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
-    backdropFilter: 'blur(4px)'
+    backdropFilter: 'blur(4px)',
+    padding: '16px'
   },
   modalContent: {
     width: '100%',
     maxWidth: '480px',
-    padding: '24px',
+    padding: 'clamp(16px, 4vw, 24px)',
     backgroundColor: 'var(--bg-panel)',
-    borderColor: 'var(--border-glass)'
+    borderColor: 'var(--border-glass)',
+    maxHeight: '90vh',
+    overflowY: 'auto'
   },
   modalHeader: {
     display: 'flex',

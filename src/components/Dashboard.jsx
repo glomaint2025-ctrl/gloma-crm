@@ -328,7 +328,7 @@ export default function Dashboard({
 
       {isAdminOrDev ? (
         /* ================= ADMIN / DEVELOPER VIEW ================= */
-        <div style={styles.mainGrid}>
+        <div className="grid-2col-15-1">
           {/* Workload */}
           <div className="glass-panel" style={styles.gridSection}>
             <div style={styles.sectionHeader}>
@@ -440,7 +440,7 @@ export default function Dashboard({
         </div>
       ) : (
         /* ================= EMPLOYEE PERSONAL DASHBOARD ================= */
-        <div style={styles.mainGrid}>
+        <div className="grid-2col-15-1">
           
           {/* Left panel: assigned tasks list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -670,12 +670,6 @@ const styles = {
     backgroundColor: 'var(--color-gold)',
     borderRadius: 'var(--radius-full)',
     transition: 'width var(--transition-slow)'
-  },
-  mainGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1.5fr 1fr',
-    gap: '20px',
-    alignItems: 'start'
   },
   gridSection: {
     padding: '20px',

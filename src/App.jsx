@@ -12,19 +12,21 @@ import TeamMembers from './components/TeamMembers';
 import ManageRoles from './components/ManageRoles';
 import SetupSettings from './components/SetupSettings';
 
-import { 
-  LayoutDashboard, 
-  Layers, 
-  Send, 
-  FileCheck, 
-  Settings, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Layers,
+  Send,
+  FileCheck,
+  Settings,
+  LogOut,
   Cpu,
   User,
   Users,
   Calendar,
   Shield,
-  ShieldAlert
+  ShieldAlert,
+  Menu,
+  X
 } from 'lucide-react';
 
 const sidebarTranslations = {
@@ -73,6 +75,7 @@ export default function App() {
   const [sessionUser, setSessionUser] = useState(null);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [activeView, setActiveView] = useState('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   
   // Database tables states
   const [profiles, setProfiles] = useState([]);
@@ -498,6 +501,11 @@ export default function App() {
     }
   };
 
+  const navTo = (view) => {
+    setActiveView(view);
+    setMobileNavOpen(false);
+  };
+
   if (loading) {
     return (
       <div style={styles.loaderContainer}>
@@ -513,59 +521,79 @@ export default function App() {
 
   return (
     <div className="app-container">
-      
+
+      {/* Mobile-only top bar with hamburger toggle */}
+      <div className="mobile-topbar">
+        <button className="mobile-icon-btn" onClick={() => setMobileNavOpen(true)} aria-label="Open menu">
+          <Menu size={20} />
+        </button>
+        <img src="/logo.png" alt="Gloma Logo" style={{ width: '26px', height: '26px', objectFit: 'contain' }} />
+        <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, letterSpacing: '0.06em', fontSize: 'var(--font-size-md)' }}>
+          GLOMA
+        </span>
+      </div>
+
+      {/* Backdrop shown behind the mobile drawer */}
+      <div
+        className={`sidebar-overlay ${mobileNavOpen ? 'visible' : ''}`}
+        onClick={() => setMobileNavOpen(false)}
+      />
+
       {/* Sidebar Navigation */}
-      <div className="glass-panel" style={styles.sidebar}>
-        
+      <div className={`glass-panel sidebar-panel ${mobileNavOpen ? 'open' : ''}`} style={styles.sidebar}>
+
         {/* Branding header */}
         <div style={styles.sidebarBrand}>
           <img src="/logo.png" alt="Gloma Logo" style={styles.logoImage} />
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={styles.brandTitle}>GLOMA</div>
             <div style={styles.brandSubtitle}>CRM PORTAL</div>
           </div>
+          <button className="mobile-icon-btn" onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
+            <X size={18} />
+          </button>
         </div>
 
         {/* Navigation Items */}
         <nav style={styles.navMenu}>
-          
-          <button 
-            onClick={() => setActiveView('dashboard')} 
+
+          <button
+            onClick={() => navTo('dashboard')}
             className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`}
           >
             <LayoutDashboard size={18} /> {sbT.dashboard}
           </button>
-          
-          <button 
-            onClick={() => setActiveView('clients')} 
+
+          <button
+            onClick={() => navTo('clients')}
             className={`nav-btn ${activeView === 'clients' ? 'active' : ''}`}
           >
             <Users size={18} /> {sbT.clients}
           </button>
-          
-          <button 
-            onClick={() => setActiveView('tasks')} 
+
+          <button
+            onClick={() => navTo('tasks')}
             className={`nav-btn ${activeView === 'tasks' ? 'active' : ''}`}
           >
             <Layers size={18} /> {sbT.tasks}
           </button>
 
-          <button 
-            onClick={() => setActiveView('calendar')} 
+          <button
+            onClick={() => navTo('calendar')}
             className={`nav-btn ${activeView === 'calendar' ? 'active' : ''}`}
           >
             <Calendar size={18} /> {sbT.calendar}
           </button>
 
-          <button 
-            onClick={() => setActiveView('updates')} 
+          <button
+            onClick={() => navTo('updates')}
             className={`nav-btn ${activeView === 'updates' ? 'active' : ''}`}
           >
             <Send size={18} /> {sbT.updates}
           </button>
 
-          <button 
-            onClick={() => setActiveView('deliveries')} 
+          <button
+            onClick={() => navTo('deliveries')}
             className={`nav-btn ${activeView === 'deliveries' ? 'active' : ''}`}
           >
             <FileCheck size={18} /> {sbT.deliveries}
@@ -573,7 +601,7 @@ export default function App() {
 
           {/* Team directory: visible to ALL team members */}
           <button
-            onClick={() => setActiveView('team')}
+            onClick={() => navTo('team')}
             className={`nav-btn ${activeView === 'team' ? 'active' : ''}`}
           >
             <Users size={18} /> {sbT.team}
@@ -582,7 +610,7 @@ export default function App() {
           {/* Manage Roles: Admin + Developer only */}
           {(currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Developer') && (
             <button
-              onClick={() => setActiveView('roles')}
+              onClick={() => navTo('roles')}
               className={`nav-btn ${activeView === 'roles' ? 'active' : ''}`}
             >
               <Shield size={18} /> {sbT.roles}
@@ -590,7 +618,7 @@ export default function App() {
           )}
 
           <button
-            onClick={() => setActiveView('settings')}
+            onClick={() => navTo('settings')}
             className={`nav-btn ${activeView === 'settings' ? 'active' : ''}`}
           >
             <Settings size={18} /> {sbT.settings}

@@ -346,7 +346,7 @@ export default function SetupSettings({
 
   return (
     <div style={styles.container} className="animate-fade-in">
-      <div style={styles.tabGrid}>
+      <div className="settings-tab-grid">
         
         {/* Settings Left-Sidebar */}
         <div className="glass-panel" style={styles.sidebar}>
@@ -687,12 +687,6 @@ const styles = {
     flexDirection: 'column',
     gap: '20px'
   },
-  tabGrid: {
-    display: 'grid',
-    gridTemplateColumns: '250px 1fr',
-    gap: '20px',
-    alignItems: 'start'
-  },
   sidebar: {
     padding: '12px',
     display: 'flex',
@@ -729,7 +723,8 @@ const styles = {
     backgroundColor: 'rgba(17,24,39,0.3)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-md)',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    flexWrap: 'wrap'
   },
   profileAvatar: {
     width: '60px',
@@ -793,6 +788,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '10px',
     padding: '16px',
     borderRadius: 'var(--radius-md)'
   },

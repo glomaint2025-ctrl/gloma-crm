@@ -98,7 +98,7 @@ export default function DailyUpdates({
 
   return (
     <div style={styles.container} className="animate-fade-in">
-      <div style={styles.grid}>
+      <div className="grid-2col-1-1">
         
         {/* Left Column: Create EOD Update */}
         <div className="glass-panel" style={styles.formSection}>
@@ -364,12 +364,6 @@ const styles = {
     flexDirection: 'column',
     gap: '20px'
   },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '20px',
-    alignItems: 'start'
-  },
   formSection: {
     padding: '24px',
     backgroundColor: 'var(--bg-glass)'
@@ -430,10 +424,11 @@ const styles = {
   logFilters: {
     display: 'flex',
     gap: '10px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    flexWrap: 'wrap'
   },
   logSearchInput: {
-    flex: 1,
+    flex: '1 1 200px',
     padding: '8px 12px'
   },
   logEmpSelect: {
