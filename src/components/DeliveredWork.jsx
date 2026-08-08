@@ -146,7 +146,7 @@ export default function DeliveredWork({
         <div className="glass-panel" style={styles.formContainer}>
           <div style={styles.formHeader}>
             <FileCheck size={18} color="var(--color-gold)" />
-            <h3 style={{ fontSize: 16 }}>Register Final Work Submission</h3>
+            <h3 style={{ fontSize: 'var(--font-size-lg)' }}>Register Final Work Submission</h3>
           </div>
 
           <form onSubmit={handleSubmit} style={styles.form}>
@@ -294,7 +294,7 @@ export default function DeliveredWork({
                         <ExternalLink size={13} /> Open File
                       </a>
                     ) : (
-                      <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>No link</span>
+                      <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>No link</span>
                     )}
                   </td>
                   <td>
@@ -327,7 +327,7 @@ export default function DeliveredWork({
                   </td>
                   <td>
                     <div style={styles.notesBlock}>
-                      <div style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{del.notes}</div>
+                      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>{del.notes}</div>
                       {del.client_approval === 'Revision Requested' && (
                         <div style={styles.revisionAlert}>
                           <strong>Revision details:</strong> {del.revision_status}
@@ -388,7 +388,7 @@ const styles = {
   },
   addBtn: {
     padding: '8px 16px',
-    fontSize: '13px'
+    fontSize: 'var(--font-size-sm)'
   },
   formContainer: {
     padding: '24px',
@@ -416,7 +416,7 @@ const styles = {
   },
   label: {
     display: 'block',
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: '750',
     color: 'var(--color-text-secondary)',
     letterSpacing: '0.04em',
@@ -431,7 +431,7 @@ const styles = {
   },
   clientTag: {
     padding: '2px 6px',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     backgroundColor: 'rgba(212, 175, 55, 0.05)',
     border: '1px solid rgba(212, 175, 55, 0.15)',
     borderRadius: '4px',
@@ -440,9 +440,9 @@ const styles = {
     whiteSpace: 'nowrap'
   },
   platformBadge: {
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     padding: '2px 8px',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: 'var(--bg-translucent-white)',
     border: '1px solid var(--border-subtle)',
     borderRadius: '4px',
     color: 'var(--color-text-secondary)'
@@ -451,7 +451,7 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '4px',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: 'bold',
     color: 'var(--color-gold)'
   },
@@ -465,7 +465,7 @@ const styles = {
     const isApp = status === 'Approved';
     const isRev = status === 'Revision Requested';
     return {
-      fontSize: '11px',
+      fontSize: 'var(--font-size-xs)',
       fontWeight: 'bold',
       padding: '4px 10px',
       borderRadius: 'var(--radius-full)',
@@ -482,21 +482,21 @@ const styles = {
   },
   miniApproveBtn: {
     padding: '3px 8px',
-    fontSize: '9px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: '600',
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     border: '1px solid #10B981',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     borderRadius: '3px',
     cursor: 'pointer'
   },
   miniRejectBtn: {
     padding: '3px 8px',
-    fontSize: '9px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: '600',
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
     border: '1px solid #EF4444',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     borderRadius: '3px',
     cursor: 'pointer'
   },
@@ -506,7 +506,7 @@ const styles = {
     gap: '4px'
   },
   revisionAlert: {
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     padding: '6px 10px',
     backgroundColor: 'rgba(239, 68, 68, 0.05)',
     border: '1px solid rgba(239, 68, 68, 0.2)',

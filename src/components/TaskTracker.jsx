@@ -469,7 +469,7 @@ export default function TaskTracker({
               >
                 {/* Column header */}
                 <div style={{ ...styles.columnHeader, borderBottom: `2.5px solid ${col.color}` }}>
-                  <span style={{ fontWeight: '700', fontSize: '13px' }}>{col.title}</span>
+                  <span style={{ fontWeight: '700', fontSize: 'var(--font-size-sm)' }}>{col.title}</span>
                   <span style={styles.columnCount}>{columnTasks.length}</span>
                 </div>
 
@@ -498,10 +498,10 @@ export default function TaskTracker({
                       <div style={styles.cardTitle}>{task.title}</div>
                       
                       <div style={styles.cardInfoRow}>
-                        <span style={{ fontSize: '11px', color: 'var(--color-gold)', fontWeight: 'bold' }}>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gold)', fontWeight: 'bold' }}>
                           {task.work_type}
                         </span>
-                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
                           {task.employee_name || t.unassigned}
                         </span>
                       </div>
@@ -561,7 +561,7 @@ export default function TaskTracker({
                   <tr key={task.id}>
                     <td style={{ fontWeight: 'bold', color: 'var(--color-gold)' }}>{task.id}</td>
                     <td>{task.client_project}</td>
-                    <td style={{ fontSize: '12px', fontWeight: 'bold' }}>{task.work_type}</td>
+                    <td style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'bold' }}>{task.work_type}</td>
                     <td style={{ maxWidth: '280px', textOverflow: 'ellipsis', overflow: 'hidden' }}>{task.title}</td>
                     <td>{task.employee_name || t.unassigned}</td>
                     <td>{task.start_date || 'N/A'}</td>
@@ -570,7 +570,7 @@ export default function TaskTracker({
                       <span style={{ 
                         color: task.priority === 'High' ? 'var(--color-priority-high)' : task.priority === 'Normal' ? 'var(--color-priority-normal)' : 'var(--color-priority-low)',
                         fontWeight: 'bold',
-                        fontSize: '12px'
+                        fontSize: 'var(--font-size-sm)'
                       }}>
                         {task.priority}
                       </span>
@@ -888,7 +888,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    backgroundColor: 'rgba(17, 24, 39, 0.4)',
+    backgroundColor: 'var(--bg-badge-dark)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)',
     padding: '8px 12px',
@@ -899,9 +899,9 @@ const styles = {
     background: 'none',
     border: 'none',
     outline: 'none',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     width: '100%',
-    fontSize: '13px'
+    fontSize: 'var(--font-size-sm)'
   },
   filtersGroup: {
     display: 'flex',
@@ -912,7 +912,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    backgroundColor: 'rgba(17, 24, 39, 0.4)',
+    backgroundColor: 'var(--bg-badge-dark)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)',
     padding: '6px 12px'
@@ -922,12 +922,12 @@ const styles = {
     border: 'none',
     outline: 'none',
     color: 'var(--color-text-primary)',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     cursor: 'pointer'
   },
   toggleGroup: {
     display: 'flex',
-    backgroundColor: 'rgba(17,24,39,0.5)',
+    backgroundColor: 'var(--bg-badge-dark)',
     padding: '3px',
     borderRadius: 'var(--radius-sm)',
     border: '1px solid var(--border-subtle)'
@@ -936,7 +936,7 @@ const styles = {
     border: 'none',
     padding: '6px 12px',
     borderRadius: '4px',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
@@ -952,7 +952,7 @@ const styles = {
   },
   boardColumn: {
     minHeight: '450px',
-    backgroundColor: 'rgba(17, 24, 39, 0.25)',
+    backgroundColor: 'var(--bg-badge-dark)',
     borderColor: 'var(--border-subtle)',
     padding: '12px',
     borderRadius: 'var(--radius-md)',
@@ -968,7 +968,7 @@ const styles = {
     marginBottom: '4px'
   },
   columnCount: {
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: 'bold',
     backgroundColor: 'rgba(255,255,255,0.06)',
     padding: '2px 8px',
@@ -999,22 +999,22 @@ const styles = {
     alignItems: 'center'
   },
   cardId: {
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: 'bold',
     color: 'var(--color-text-secondary)'
   },
   cardPriority: {
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: 'bold',
     textTransform: 'uppercase'
   },
   cardClient: {
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '700',
     color: 'var(--color-gold)'
   },
   cardTitle: {
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '500',
     lineHeight: 1.4,
     color: 'var(--color-text-primary)'
@@ -1030,7 +1030,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     color: 'var(--color-text-secondary)'
   },
   progressContainer: {
@@ -1042,7 +1042,7 @@ const styles = {
   progressBarBg: {
     flexGrow: 1,
     height: '4px',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'var(--bg-translucent-white)',
     borderRadius: 'var(--radius-full)',
     overflow: 'hidden'
   },
@@ -1052,7 +1052,7 @@ const styles = {
     borderRadius: 'var(--radius-full)'
   },
   progressPercent: {
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: 'bold',
     color: 'var(--color-text-secondary)',
     minWidth: '24px',
@@ -1064,12 +1064,12 @@ const styles = {
     marginTop: '6px'
   },
   touchBtn: {
-    fontSize: '10px',
-    background: 'rgba(255,255,255,0.05)',
+    fontSize: 'var(--font-size-xs)',
+    background: 'var(--bg-translucent-white)',
     border: '1px solid var(--border-subtle)',
     cursor: 'pointer',
     padding: '2px 8px',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     borderRadius: '4px'
   },
   gridActionBtn: {
@@ -1084,7 +1084,7 @@ const styles = {
     textAlign: 'center',
     padding: '30px',
     color: 'var(--color-text-muted)',
-    fontSize: '14px'
+    fontSize: 'var(--font-size-md)'
   },
   modalOverlay: {
     position: 'fixed',
@@ -1115,7 +1115,7 @@ const styles = {
     marginBottom: '15px'
   },
   closeBtn: {
-    fontSize: '24px',
+    fontSize: 'var(--font-size-2xl)',
     background: 'none',
     border: 'none',
     color: 'var(--color-text-muted)',
@@ -1132,7 +1132,7 @@ const styles = {
   },
   modalLabel: {
     display: 'block',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: 'bold',
     color: 'var(--color-text-secondary)',
     marginBottom: '4px'

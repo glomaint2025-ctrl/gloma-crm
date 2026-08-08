@@ -157,7 +157,7 @@ export default function Clients({
                       {c.status === 'Active' ? t.active : t.inactive}
                     </span>
                   </td>
-                  <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                  <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
                     {new Date(c.created_at).toLocaleDateString()}
                   </td>
                   {canManage && (
@@ -273,7 +273,7 @@ const styles = {
     marginBottom: '20px'
   },
   closeBtn: {
-    fontSize: '24px',
+    fontSize: 'var(--font-size-2xl)',
     background: 'none',
     border: 'none',
     color: 'var(--color-text-muted)',
@@ -281,7 +281,7 @@ const styles = {
   },
   modalLabel: {
     display: 'block',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
     color: 'var(--color-text-secondary)',
     marginBottom: '6px'

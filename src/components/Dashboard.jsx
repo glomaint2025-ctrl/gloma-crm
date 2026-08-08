@@ -261,7 +261,7 @@ export default function Dashboard({
       {/* Main KPI Stats Bar */}
       <div style={styles.statsGrid}>
         <div className="glass-panel" style={styles.statCard}>
-          <div style={{ ...styles.iconWrapper, backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+          <div style={{ ...styles.iconWrapper, backgroundColor: 'var(--bg-translucent-white)' }}>
             <TrendingUp size={22} color="#fff" />
           </div>
           <div>
@@ -386,7 +386,7 @@ export default function Dashboard({
               </div>
               <div style={styles.statusMixContainer}>
                 {totalCount === 0 ? (
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>No stats to build profile</div>
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>No stats to build profile</div>
                 ) : (
                   <>
                     <div style={styles.mixLegendRow}>
@@ -424,11 +424,11 @@ export default function Dashboard({
                 <div style={styles.troubleList}>
                   {overdueTasksList.map((task, index) => (
                     <div key={index} style={styles.troubleItem}>
-                      <div style={{ fontWeight: '600', fontSize: 13, color: '#fff' }}>
+                      <div style={{ fontWeight: '600', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
                         {task.id} &bull; {task.client_project}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{task.title}</div>
-                      <div style={{ fontSize: 11, color: '#EF4444', marginTop: '2px' }}>
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{task.title}</div>
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: '#EF4444', marginTop: '2px' }}>
                         {t.troubleDue} {new Date(task.due_date).toLocaleDateString()} ({task.employee_name})
                       </div>
                     </div>
@@ -468,7 +468,7 @@ export default function Dashboard({
                         <td style={{ fontWeight: 'bold', color: 'var(--color-gold)' }}>{task.id}</td>
                         <td>{task.client_project}</td>
                         <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</td>
-                        <td style={{ fontSize: '11px', fontWeight: 'bold' }}>{task.work_type}</td>
+                        <td style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'bold' }}>{task.work_type}</td>
                         <td style={{ color: task.due_date < todayStr ? '#EF4444' : 'inherit' }}>{task.due_date}</td>
                         <td>
                           <span className="badge" style={{
@@ -529,9 +529,9 @@ export default function Dashboard({
               <div style={styles.alertsContainer}>
                 {myNotifications.map(n => (
                   <div key={n.id} style={styles.alertCard}>
-                    <p style={{ fontSize: '13px', color: '#fff', margin: 0 }}>{n.message}</p>
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)', margin: 0 }}>{n.message}</p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>
+                      <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
                         {new Date(n.created_at).toLocaleTimeString()}
                       </span>
                       <button onClick={() => handleDismissNotification(n.id)} style={styles.dismissBtn}>
@@ -542,7 +542,7 @@ export default function Dashboard({
                 ))}
 
                 {myNotifications.length === 0 && (
-                  <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px', padding: '16px' }}>
+                  <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', padding: '16px' }}>
                     {t.noNotifications}
                   </div>
                 )}
@@ -558,10 +558,10 @@ export default function Dashboard({
                 <div style={styles.troubleList}>
                   {overdueTasksList.map((task, index) => (
                     <div key={index} style={styles.troubleItem}>
-                      <div style={{ fontWeight: '600', fontSize: 13, color: '#fff' }}>
+                      <div style={{ fontWeight: '600', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
                         {task.id} &bull; {task.client_project}
                       </div>
-                      <div style={{ fontSize: 11, color: '#EF4444', marginTop: '2px' }}>
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: '#EF4444', marginTop: '2px' }}>
                         {t.troubleDue} {new Date(task.due_date).toLocaleDateString()}
                       </div>
                     </div>
@@ -593,21 +593,21 @@ const styles = {
     gap: '12px'
   },
   title: {
-    fontSize: '24px',
+    fontSize: 'var(--font-size-2xl)',
     fontWeight: '800',
     letterSpacing: '-0.02em',
-    color: '#fff'
+    color: 'var(--color-text-primary)'
   },
   subtitle: {
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     color: 'var(--color-text-secondary)',
     marginTop: '2px'
   },
   dateBadge: {
     padding: '8px 16px',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
-    backgroundColor: 'rgba(17, 24, 39, 0.4)',
+    backgroundColor: 'var(--bg-badge-dark)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)',
     display: 'flex',
@@ -615,15 +615,15 @@ const styles = {
   },
   clockBadge: {
     padding: '8px 16px',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
-    backgroundColor: 'rgba(17, 24, 39, 0.4)',
+    backgroundColor: 'var(--bg-badge-dark)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    color: '#fff'
+    color: 'var(--color-text-primary)'
   },
   statsGrid: {
     display: 'grid',
@@ -646,13 +646,13 @@ const styles = {
     borderRadius: '8px'
   },
   statLabel: {
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: '700',
     color: 'var(--color-text-secondary)',
     letterSpacing: '0.05em'
   },
   statValue: {
-    fontSize: '22px',
+    fontSize: 'var(--font-size-xl)',
     fontWeight: '850',
     marginTop: '2px',
     lineHeight: 1
@@ -660,7 +660,7 @@ const styles = {
   progressBarBg: {
     width: '100%',
     height: '5px',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'var(--bg-translucent-white)',
     borderRadius: 'var(--radius-full)',
     marginTop: '6px',
     overflow: 'hidden'
@@ -690,9 +690,9 @@ const styles = {
     marginBottom: '16px'
   },
   sectionTitle: {
-    fontSize: '15px',
+    fontSize: 'var(--font-size-md)',
     fontWeight: '700',
-    color: '#fff'
+    color: 'var(--color-text-primary)'
   },
   employeeCell: {
     display: 'flex',
@@ -709,12 +709,12 @@ const styles = {
   empName: {
     display: 'block',
     fontWeight: '600',
-    fontSize: '13px',
-    color: '#fff'
+    fontSize: 'var(--font-size-sm)',
+    color: 'var(--color-text-primary)'
   },
   empRole: {
     display: 'block',
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     color: 'var(--color-text-secondary)',
     textTransform: 'uppercase'
   },
@@ -733,7 +733,7 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '8px 12px',
-    backgroundColor: 'rgba(17, 24, 39, 0.2)',
+    backgroundColor: 'var(--bg-badge-dark)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)'
   },
@@ -745,12 +745,12 @@ const styles = {
   }),
   legendLabel: {
     flex: 1,
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     color: 'var(--color-text-primary)'
   },
   legendValue: {
     fontWeight: 'bold',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     color: 'var(--color-text-secondary)'
   },
   dangerNotice: {
@@ -781,12 +781,12 @@ const styles = {
   notesTextarea: {
     width: '100%',
     padding: '12px',
-    backgroundColor: 'rgba(17, 24, 39, 0.6)',
+    backgroundColor: 'var(--bg-badge-dark)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     fontFamily: 'inherit',
-    fontSize: '14px',
+    fontSize: 'var(--font-size-md)',
     resize: 'none',
     outline: 'none',
     lineHeight: '1.4'
@@ -803,13 +803,13 @@ const styles = {
     backgroundColor: 'rgba(212,175,55,0.06)',
     borderLeft: '3.5px solid var(--color-gold)',
     borderRadius: '4px',
-    border: '1px solid rgba(255,255,255,0.05)'
+    border: '1px solid var(--bg-translucent-white)'
   },
   dismissBtn: {
     background: 'none',
     border: 'none',
     color: 'var(--color-gold)',
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: 'bold',
     cursor: 'pointer',
     padding: 0

@@ -439,14 +439,14 @@ const styles = {
     border: 'none',
     outline: 'none',
     color: 'var(--color-text-primary)',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     cursor: 'pointer'
   },
   pagination: {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    backgroundColor: 'rgba(17,24,39,0.5)',
+    backgroundColor: 'var(--bg-badge-dark)',
     padding: '4px',
     borderRadius: 'var(--radius-sm)',
     border: '1px solid var(--border-subtle)'
@@ -462,9 +462,9 @@ const styles = {
     padding: '4px'
   },
   monthDisplay: {
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     minWidth: '100px',
     textAlign: 'center'
   },
@@ -473,12 +473,12 @@ const styles = {
     gridTemplateColumns: 'repeat(7, 1fr)',
     gap: '1px',
     textAlign: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'var(--bg-translucent-white)',
     borderRadius: 'var(--radius-xs)',
     padding: '8px 0'
   },
   weekLabel: {
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: 'bold',
     color: 'var(--color-text-secondary)',
     textTransform: 'uppercase'
@@ -505,7 +505,7 @@ const styles = {
     pointerEvents: 'none'
   },
   dayNumber: {
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     alignSelf: 'flex-end'
   },
   dayTasksContainer: {
@@ -558,7 +558,7 @@ const styles = {
     marginBottom: '15px'
   },
   closeBtn: {
-    fontSize: '24px',
+    fontSize: 'var(--font-size-2xl)',
     background: 'none',
     border: 'none',
     color: 'var(--color-text-muted)',
@@ -574,12 +574,12 @@ const styles = {
     backgroundColor: 'rgba(212,175,55,0.08)',
     border: '1px dashed rgba(212,175,55,0.3)',
     borderRadius: 'var(--radius-sm)',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     color: 'var(--color-text-primary)'
   },
   label: {
     display: 'block',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: 'bold',
     color: 'var(--color-text-secondary)',
     marginBottom: '4px'

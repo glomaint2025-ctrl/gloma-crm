@@ -421,77 +421,49 @@ export default function App() {
           
           <button 
             onClick={() => setActiveView('dashboard')} 
-            style={{ 
-              ...styles.navBtn, 
-              backgroundColor: activeView === 'dashboard' ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
-              color: activeView === 'dashboard' ? 'var(--color-gold)' : 'var(--color-text-primary)'
-            }}
+            className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`}
           >
             <LayoutDashboard size={18} /> {sbT.dashboard}
           </button>
           
           <button 
             onClick={() => setActiveView('clients')} 
-            style={{ 
-              ...styles.navBtn, 
-              backgroundColor: activeView === 'clients' ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
-              color: activeView === 'clients' ? 'var(--color-gold)' : 'var(--color-text-primary)'
-            }}
+            className={`nav-btn ${activeView === 'clients' ? 'active' : ''}`}
           >
             <Users size={18} /> {sbT.clients}
           </button>
           
           <button 
             onClick={() => setActiveView('tasks')} 
-            style={{ 
-              ...styles.navBtn, 
-              backgroundColor: activeView === 'tasks' ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
-              color: activeView === 'tasks' ? 'var(--color-gold)' : 'var(--color-text-primary)'
-            }}
+            className={`nav-btn ${activeView === 'tasks' ? 'active' : ''}`}
           >
             <Layers size={18} /> {sbT.tasks}
           </button>
 
           <button 
             onClick={() => setActiveView('calendar')} 
-            style={{ 
-              ...styles.navBtn, 
-              backgroundColor: activeView === 'calendar' ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
-              color: activeView === 'calendar' ? 'var(--color-gold)' : 'var(--color-text-primary)'
-            }}
+            className={`nav-btn ${activeView === 'calendar' ? 'active' : ''}`}
           >
             <Calendar size={18} /> {sbT.calendar}
           </button>
 
           <button 
             onClick={() => setActiveView('updates')} 
-            style={{ 
-              ...styles.navBtn, 
-              backgroundColor: activeView === 'updates' ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
-              color: activeView === 'updates' ? 'var(--color-gold)' : 'var(--color-text-primary)'
-            }}
+            className={`nav-btn ${activeView === 'updates' ? 'active' : ''}`}
           >
             <Send size={18} /> {sbT.updates}
           </button>
 
           <button 
             onClick={() => setActiveView('deliveries')} 
-            style={{ 
-              ...styles.navBtn, 
-              backgroundColor: activeView === 'deliveries' ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
-              color: activeView === 'deliveries' ? 'var(--color-gold)' : 'var(--color-text-primary)'
-            }}
+            className={`nav-btn ${activeView === 'deliveries' ? 'active' : ''}`}
           >
             <FileCheck size={18} /> {sbT.deliveries}
           </button>
 
           <button 
             onClick={() => setActiveView('settings')} 
-            style={{ 
-              ...styles.navBtn, 
-              backgroundColor: activeView === 'settings' ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
-              color: activeView === 'settings' ? 'var(--color-gold)' : 'var(--color-text-primary)'
-            }}
+            className={`nav-btn ${activeView === 'settings' ? 'active' : ''}`}
           >
             <Settings size={18} /> {sbT.settings}
           </button>
@@ -526,7 +498,7 @@ export default function App() {
         {isUsingMock && (
           <div className="glass-panel" style={styles.sandboxBanner}>
             <Cpu size={16} color="var(--color-gold)" />
-            <span style={{ fontSize: '11px', flex: 1 }}>
+            <span style={{ fontSize: 'var(--font-size-xs)', flex: 1 }}>
               {sbT.offlineSandbox}
             </span>
           </div>
@@ -636,7 +608,7 @@ const styles = {
   },
   loaderText: {
     fontFamily: 'var(--font-heading)',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: 'bold',
     color: '#D4AF37',
     letterSpacing: '0.25em'
@@ -644,13 +616,14 @@ const styles = {
   sidebar: {
     border: 'none',
     borderRight: '1px solid var(--border-glass)',
-    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+    backgroundColor: 'var(--bg-secondary)',
     borderRadius: 0,
     height: '100vh',
     padding: '24px 16px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '24px'
+    gap: '24px',
+    transition: 'background-color 0.3s ease'
   },
   sidebarBrand: {
     display: 'flex',
@@ -672,7 +645,7 @@ const styles = {
     height: '32px',
     backgroundColor: '#0c1a30',
     clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-    border: '1px solid rgba(255,255,255,0.05)'
+    border: '1px solid var(--bg-translucent-white)'
   },
   logoGoldPrism: {
     position: 'absolute',
@@ -685,14 +658,14 @@ const styles = {
   },
   brandTitle: {
     fontFamily: 'var(--font-heading)',
-    fontSize: '20px',
+    fontSize: 'var(--font-size-xl)',
     fontWeight: '800',
     letterSpacing: '0.08em',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     lineHeight: 1
   },
   brandSubtitle: {
-    fontSize: '8px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: 'bold',
     color: 'var(--color-gold)',
     letterSpacing: '0.2em',
@@ -712,7 +685,7 @@ const styles = {
     padding: '11px 16px',
     border: 'none',
     borderRadius: 'var(--radius-sm)',
-    fontSize: '13.5px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
     cursor: 'pointer',
     textAlign: 'left',
@@ -744,15 +717,15 @@ const styles = {
     objectFit: 'cover'
   },
   profileName: {
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
   },
   profileRole: {
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     color: 'var(--color-text-secondary)',
     textTransform: 'uppercase'
   },
@@ -762,12 +735,12 @@ const styles = {
     justifyContent: 'center',
     gap: '6px',
     padding: '8px',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: 'var(--bg-translucent-white)',
     border: '1px solid var(--border-subtle)',
     color: 'var(--color-text-secondary)',
     borderRadius: 'var(--radius-sm)',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
     transition: 'all var(--transition-fast)'
   },

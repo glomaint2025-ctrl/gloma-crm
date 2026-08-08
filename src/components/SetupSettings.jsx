@@ -355,8 +355,8 @@ export default function SetupSettings({
                   style={styles.profileAvatar} 
                 />
                 <div>
-                  <h4 style={{ fontSize: 18, color: 'var(--color-gold)', fontWeight: 'bold' }}>{currentUserProfile?.full_name}</h4>
-                  <p style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>{currentUserProfile?.email}</p>
+                  <h4 style={{ fontSize: 'var(--font-size-lg)', color: 'var(--color-gold)', fontWeight: 'bold' }}>{currentUserProfile?.full_name}</h4>
+                  <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>{currentUserProfile?.email}</p>
                   
                   <div style={styles.roleTag(currentUserProfile?.role)}>
                     <Shield size={11} /> {currentUserProfile?.role}
@@ -382,9 +382,9 @@ export default function SetupSettings({
                 <div style={styles.driveCard} className="glass-card-interactive">
                   <div>
                     <strong>{driveWorkspace.rootName}</strong>
-                    <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>Gloma company master cloud files</p>
+                    <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 4 }}>Gloma company master cloud files</p>
                   </div>
-                  <a href={driveWorkspace.rootLink} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', fontSize: 12 }}>
+                  <a href={driveWorkspace.rootLink} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', fontSize: 'var(--font-size-sm)' }}>
                     Open directory
                   </a>
                 </div>
@@ -393,7 +393,7 @@ export default function SetupSettings({
                   <div>
                     <strong>Devin share directory link</strong>
                   </div>
-                  <a href={driveWorkspace.devinWorks} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', fontSize: 12 }}>
+                  <a href={driveWorkspace.devinWorks} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', fontSize: 'var(--font-size-sm)' }}>
                     Open directory
                   </a>
                 </div>
@@ -402,7 +402,7 @@ export default function SetupSettings({
                   <div>
                     <strong>Bishwa share directory link</strong>
                   </div>
-                  <a href={driveWorkspace.bishwaWorks} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', fontSize: 12 }}>
+                  <a href={driveWorkspace.bishwaWorks} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', fontSize: 'var(--font-size-sm)' }}>
                     Open directory
                   </a>
                 </div>
@@ -435,7 +435,7 @@ export default function SetupSettings({
                   <Check size={18} color="var(--color-delivered)" />
                   <div>
                     <strong>Excel import parsed successfully!</strong>
-                    <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 4 }}>
                       Loaded <strong>{importStats.tasksCount} tasks</strong>.
                     </p>
                   </div>
@@ -448,7 +448,7 @@ export default function SetupSettings({
           {activeTab === 'team' && (
             <div>
               <h3 style={styles.tabTitle}>{t.titleTeam}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginBottom: 16 }}>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 16 }}>
                 Overview of all registered team members and their current roles.
               </p>
               
@@ -461,8 +461,8 @@ export default function SetupSettings({
                       style={styles.teamAvatar} 
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '600', fontSize: 14 }}>{p.full_name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.email}</div>
+                      <div style={{ fontWeight: '600', fontSize: 'var(--font-size-md)' }}>{p.full_name}</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: 2 }}>{p.email}</div>
                     </div>
                     <div style={styles.roleTag(p.role)}>
                       <Shield size={10} /> {p.role}
@@ -482,7 +482,7 @@ export default function SetupSettings({
           {activeTab === 'roles' && isAdminOrDev && (
             <div>
               <h3 style={styles.tabTitle}>{t.titleRoles}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginBottom: 16 }}>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 16 }}>
                 Assign authority levels to team members.
                 {isAdmin && ' Developer accounts are hidden from this view.'}
               </p>
@@ -518,7 +518,7 @@ export default function SetupSettings({
                         </td>
                         <td>
                           {p.id === currentUserProfile.id ? (
-                            <span style={{ fontWeight: 'bold', color: 'var(--color-gold)', fontSize: 13 }}>
+                            <span style={{ fontWeight: 'bold', color: 'var(--color-gold)', fontSize: 'var(--font-size-sm)' }}>
                               (Your Account)
                             </span>
                           ) : (
@@ -651,7 +651,7 @@ const styles = {
   menuItem: {
     padding: '12px 14px',
     borderRadius: 'var(--radius-sm)',
-    fontSize: '14px',
+    fontSize: 'var(--font-size-md)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
@@ -664,7 +664,7 @@ const styles = {
     minHeight: '500px'
   },
   tabTitle: {
-    fontSize: '17px',
+    fontSize: 'var(--font-size-lg)',
     fontWeight: '700',
     marginBottom: '10px',
     borderBottom: '1px solid var(--border-subtle)',
@@ -694,9 +694,9 @@ const styles = {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '4px',
-      fontSize: '11px',
+      fontSize: 'var(--font-size-xs)',
       fontWeight: 'bold',
-      backgroundColor: isDevRole ? 'rgba(212, 175, 55, 0.15)' : isAdminRole ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+      backgroundColor: isDevRole ? 'rgba(212, 175, 55, 0.15)' : isAdminRole ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-translucent-white)',
       color: isDevRole ? 'var(--color-gold)' : isAdminRole ? '#3B82F6' : 'var(--color-text-secondary)',
       padding: '3px 10px',
       borderRadius: 'var(--radius-full)',
@@ -775,7 +775,7 @@ const styles = {
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)',
     color: 'var(--color-text-primary)',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     lineHeight: 1.4,
     cursor: 'pointer',
     minWidth: '180px'
@@ -801,7 +801,7 @@ const styles = {
     gap: '8px'
   },
   prefLabel: {
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: 'bold',
     color: 'var(--color-text-secondary)'
   }

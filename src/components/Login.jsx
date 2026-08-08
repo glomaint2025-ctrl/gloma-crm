@@ -76,8 +76,8 @@ export default function Login({ onAuthSuccess }) {
           <div style={styles.sandBoxNotice}>
             <Cpu size={16} color="var(--color-gold)" />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-gold)' }}>LOCAL SANDBOX MODE</div>
-              <div style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-gold)' }}>LOCAL SANDBOX MODE</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
                 Supabase not connected. Login with: <strong>glomaint2025@gmail.com</strong> (Developer), 
                 <strong>bishwa@gloma.com</strong> (Admin) or <strong>devin@gloma.com</strong> (Employee) using <em>any password</em>.
               </div>
@@ -88,7 +88,7 @@ export default function Login({ onAuthSuccess }) {
         {errorMsg && (
           <div style={styles.errorAlert}>
             <AlertCircle size={18} color="var(--color-cancelled)" />
-            <span style={{ fontSize: 13, color: 'var(--color-cancelled)' }}>{errorMsg}</span>
+            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-cancelled)' }}>{errorMsg}</span>
           </div>
         )}
 
@@ -258,28 +258,28 @@ const styles = {
   },
   logoText: {
     fontFamily: 'var(--font-heading)',
-    fontSize: '28px',
+    fontSize: 'var(--font-size-2xl)',
     letterSpacing: '0.12em',
     fontWeight: '800',
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     lineHeight: 1
   },
   logoSubtext: {
     fontFamily: 'var(--font-heading)',
-    fontSize: '9px',
+    fontSize: 'var(--font-size-xs)',
     letterSpacing: '0.3em',
     color: 'var(--color-gold)',
     fontWeight: '600',
     marginTop: '6px'
   },
   cardTitle: {
-    fontSize: '20px',
+    fontSize: 'var(--font-size-xl)',
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: '6px'
   },
   cardSubtitle: {
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     color: 'var(--color-text-secondary)',
     textAlign: 'center',
     marginBottom: '20px'
@@ -315,7 +315,7 @@ const styles = {
     gap: '6px'
   },
   label: {
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
     color: 'var(--color-text-secondary)',
     letterSpacing: '0.02em',
@@ -335,7 +335,7 @@ const styles = {
   submitBtn: {
     marginTop: '10px',
     padding: '12px',
-    fontSize: '15px'
+    fontSize: 'var(--font-size-md)'
   },
   footerLinkContainer: {
     display: 'flex',
@@ -347,7 +347,7 @@ const styles = {
     border: 'none',
     color: 'var(--color-gold)',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '500',
     outline: 'none',
     transition: 'color var(--transition-fast)'

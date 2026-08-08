@@ -381,7 +381,7 @@ const styles = {
     marginBottom: '20px'
   },
   sectionTitle: {
-    fontSize: '18px',
+    fontSize: 'var(--font-size-lg)',
     fontWeight: '700'
   },
   form: {
@@ -397,7 +397,7 @@ const styles = {
   },
   formLabel: {
     display: 'block',
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: '700',
     color: 'var(--color-text-secondary)',
     letterSpacing: '0.04em',
@@ -418,7 +418,7 @@ const styles = {
   submitBtn: {
     padding: '12px',
     marginTop: '10px',
-    fontSize: '14px'
+    fontSize: 'var(--font-size-md)'
   },
   logsSection: {
     padding: '24px',
@@ -462,8 +462,8 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     fontWeight: '600',
-    fontSize: '13px',
-    color: '#fff'
+    fontSize: 'var(--font-size-sm)',
+    color: 'var(--color-text-primary)'
   },
   userBadgeAvatar: {
     width: '20px',
@@ -472,7 +472,7 @@ const styles = {
     objectFit: 'cover'
   },
   timelineDate: {
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     color: 'var(--color-text-muted)'
   },
   timelineProjectRow: {
@@ -483,9 +483,9 @@ const styles = {
     marginBottom: '10px'
   },
   projectTag: {
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: 'bold',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: 'var(--bg-translucent-white)',
     border: '1px solid var(--border-subtle)',
     padding: '1px 8px',
     borderRadius: 'var(--radius-xs)',
@@ -495,25 +495,25 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '4px',
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     backgroundColor: 'rgba(255,255,255,0.06)',
     padding: '1px 6px',
     borderRadius: '2px',
     color: 'var(--color-text-secondary)'
   },
   taskTag: {
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     fontStyle: 'italic',
     color: 'var(--color-text-muted)'
   },
   completedText: {
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     lineHeight: '1.4',
     color: 'var(--color-text-primary)',
     marginBottom: '8px'
   },
   notesField: {
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     padding: '6px 8px',
     backgroundColor: 'rgba(255,255,255,0.02)',
     border: '1px solid var(--border-subtle)',
@@ -526,7 +526,7 @@ const styles = {
     marginTop: '6px'
   },
   evidenceLink: {
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: '600',
     color: 'var(--color-gold)',
     display: 'inline-block'
@@ -543,7 +543,7 @@ const styles = {
     border: 'none',
     color: 'var(--color-text-muted)',
     cursor: 'pointer',
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '4px'
@@ -553,7 +553,7 @@ const styles = {
     border: 'none',
     color: 'var(--color-text-muted)',
     cursor: 'pointer',
-    fontSize: '10px',
+    fontSize: 'var(--font-size-xs)',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '4px'

@@ -43,6 +43,18 @@
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Theme-aware badge and translucent fills */
+  --bg-badge-dark: rgba(17, 24, 39, 0.4);
+  --bg-translucent-white: rgba(255, 255, 255, 0.05);
+
+  /* Typography Scales */
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 26px;
 }
 
 * {
@@ -305,6 +317,9 @@ body.light-theme {
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.12);
+
+  --bg-badge-dark: rgba(0, 0, 0, 0.06);
+  --bg-translucent-white: rgba(0, 0, 0, 0.04);
 }
 
 body.light-theme h1,
@@ -331,33 +346,59 @@ body.light-theme .form-input:focus {
 body.light-theme .glass-panel {
   background: var(--bg-glass);
   border-color: var(--border-glass);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme select,
+body.light-theme option {
+  background: #FFFFFF;
+  color: #1F2937;
+}
+
+body.light-theme select:focus {
+  border-color: var(--color-gold);
+}
+
+body.light-theme .table-container {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme ::-webkit-scrollbar-track {
+  background: #F5F6FA;
+}
+
+body.light-theme ::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
 }
 
 body.light-theme .glass-card-interactive {
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.85);
   border-color: rgba(0, 0, 0, 0.06);
 }
 
 body.light-theme .glass-card-interactive:hover {
   background: #FFFFFF;
   border-color: rgba(212, 175, 55, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 body.light-theme .data-table th {
   background: rgba(0, 0, 0, 0.03);
   color: #4B5563;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 
 body.light-theme .data-table td {
   color: #1F2937;
+  border-bottom-color: rgba(0, 0, 0, 0.05);
 }
 
 body.light-theme .data-table tr:hover td {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(212, 175, 55, 0.04);
 }
 
 body.light-theme .main-content {
-  background: radial-gradient(circle at 100% 0%, rgba(212, 175, 55, 0.06) 0%, transparent 60%);
+  background: linear-gradient(135deg, #F5F6FA 0%, #EEF0F5 100%);
 }
 
 body.light-theme .btn-secondary {
@@ -370,19 +411,17 @@ body.light-theme .btn-secondary:hover {
   background: rgba(0, 0, 0, 0.08);
 }
 
-body.light-theme ::-webkit-scrollbar-track {
-  background: #F5F6FA;
-}
-
-body.light-theme ::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.3);
-}
-
 /* ========================================
    FONT SIZE OVERRIDES
    ======================================== */
 body.font-small {
   font-size: 13px;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --font-size-lg: 15px;
+  --font-size-xl: 19px;
+  --font-size-2xl: 22px;
 }
 body.font-small .data-table td,
 body.font-small input,
@@ -396,10 +435,22 @@ body.font-small h3 { font-size: 14px; }
 
 body.font-normal {
   font-size: 15px;
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 26px;
 }
 
 body.font-large {
   font-size: 18px;
+  --font-size-xs: 13px;
+  --font-size-sm: 15px;
+  --font-size-md: 18px;
+  --font-size-lg: 21px;
+  --font-size-xl: 25px;
+  --font-size-2xl: 30px;
 }
 body.font-large .data-table td,
 body.font-large input,
@@ -410,3 +461,43 @@ body.font-large textarea {
 body.font-large h1 { font-size: 28px; }
 body.font-large h2 { font-size: 24px; }
 body.font-large h3 { font-size: 20px; }
+
+
+/* ========================================
+   SIDEBAR & NAVIGATION STYLES
+   ======================================== */
+.nav-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+  color: var(--color-text-secondary) !important;
+}
+
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--color-text-primary) !important;
+}
+
+body.light-theme .nav-btn:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+.nav-btn.active {
+  background: rgba(212, 175, 55, 0.1) !important;
+  color: var(--color-gold) !important;
+}
+
+body.light-theme .nav-btn.active {
+  background: rgba(212, 175, 55, 0.14) !important;
+  color: #92751a !important; /* Premium dark gold for light mode text accessibility compliance */
+}
