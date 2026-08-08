@@ -59,6 +59,8 @@ The Gloma CRM is a modern, responsive web portal:
 
 ## 3. Work done in this session (2026-08-08)
 
+> Note: this session ran as several follow-up conversations on the same day. Problems 1–3 below were the first conversation (now pushed). Problems 4–7 are later follow-ups in the same session.
+
 ### Problem 1 — "Could not find the 'language' column of 'profiles' in the schema cache"
 
 * **Cause**: the app writes `language`, `avatar_url`, `password`, `full_name` etc. to `public.profiles` on every profile save, but the live Supabase table was created without some of these columns. PostgREST rejected the update with a schema-cache error. (This confirmed the deployment is on **live Supabase**, not the offline simulator — the simulator never validates columns.)
@@ -80,28 +82,46 @@ Reasoning given by user: every team member needs to be able to see who's on the 
 * Updated **`src/App.jsx`**: imports the two new components, adds `team` / `roles` sidebar translations (en/si/ta), renders two new nav buttons between "Final Deliveries" and "System Settings", and routes `activeView === 'team'` / `'roles'` to the new components.
 * Updated **`src/components/SetupSettings.jsx`**: removed the `team` and `roles` tabs, all their state (`newMemberEmail/Name/Password/Role`, `editingUserId/Password`, `visibleProfiles`, `getSelectableRoles`, `handleRoleChange`, `allRolesList`/`adminRolesList`), and unused icon imports (`Users`, `UserPlus`, `Key`). Settings now only has: My Account Profile, G-Drive Workspace, Excel Tracker Import, Developer Preferences.
 * Verified: brace/paren/bracket balance checked programmatically on all four edited/new files (no syntax errors); no dangling references to removed state/functions remained in `SetupSettings.jsx`.
-* **Status**: ✅ Done and committed locally. Not yet pushed to GitHub (see Section 4).
+* **Status**: ✅ Done, committed, and pushed.
+
+### Problem 4 — Give the Manager role task-assignment ability
+
+User request (Sinhala): "managerta puluwan task assign karanna danna e e kenata adminta pahala access thiyenne managerta witharai" — Manager should be able to assign tasks to teammates, as the access tier directly below Admin.
+
+* **Fix**: [`src/components/TaskTracker.jsx`](src/components/TaskTracker.jsx:160) — `hasAssignPrivilege` now includes `'Manager'` alongside `'Developer'`/`'Admin'`. Manager can create/assign/edit tasks in the Task Board. Delete privilege intentionally left Developer-only (not requested). `Manage Roles` nav visibility was **not** changed — still Admin/Developer only.
+* **Status**: ✅ Done, committed, pushed.
+
+### Problem 5 — Full mobile/tablet responsiveness pass
+
+User request: make the UI fully responsive for any device/mobile phone.
+
+* **Sidebar**: was a fixed 100vh panel that, below 1024px, stacked *above* the main content (two full-height sections back to back) — effectively unusable on phones. Reworked into a real off-canvas drawer: `mobileNavOpen` state in [`src/App.jsx`](src/App.jsx), hamburger + logo top bar and a close (X) button shown only ≤900px, dark overlay backdrop, `navTo()` helper closes the drawer on navigation. New CSS in [`src/index.css`](src/index.css) (`.mobile-topbar`, `.sidebar-panel`, `.sidebar-overlay`, `.mobile-icon-btn`).
+* **Real bug found & fixed — CSS grid blowout**: `Dashboard.jsx`'s `mainGrid` (1.5fr/1fr), `DailyUpdates.jsx`'s `grid` (1fr/1fr), and `SetupSettings.jsx`'s `tabGrid` (250px/1fr) let a wide child (a data table) force the whole grid track to expand to the child's content width, silently clipped by `body { overflow-x: hidden }` — content was invisible on narrow screens with no scrollbar to reveal it. Fixed by moving these to shared CSS classes (`.grid-2col-15-1`, `.grid-2col-1-1`, `.settings-tab-grid` in `index.css`) using `grid-template-columns: minmax(0, Nfr) ...` plus `min-width: 0` on the grid and its children — the standard fix for grid-track blowout. Same `minmax(0, 1fr)` fix applied to `.app-container`/`.main-content`.
+* **Real bug found & fixed — modals mispositioned on every screen size**: `.animate-fade-in`'s mount animation ended at `transform: translateY(0)` with `animation-fill-mode: forwards`, so the transform never actually cleared to `none` after the animation finished. Per the CSS spec, *any* non-`none` computed `transform` on an ancestor (even a static/identity one) makes that ancestor the containing block for `position: fixed` descendants — so every modal (`New Task`, `Add Client`, etc.), which is `position: fixed` overlay, was anchoring to the animated wrapper instead of the viewport. Mostly invisible on desktop by coincidence; on mobile it produced a 2000px+-tall, badly offset overlay. **Fix**: `@keyframes fadeIn` in `index.css` now only animates `opacity` (no `transform` at all), which permanently avoids the containing-block trap.
+* Other fixes: `flex-wrap` added to control bars / modal form rows that assumed desktop width (`TaskTracker.jsx` formRow, `DailyUpdates.jsx` logFilters, `TeamMembers.jsx` headerRow, `Clients.jsx` title row, `SetupSettings.jsx` profileCard/driveCard); `ContentCalendar.jsx`'s 7-day grid wrapped in a horizontal-scroll container instead of squeezing to unreadable widths; modal overlays given `padding: 16px` + `clamp()` content padding so dialogs don't touch screen edges on small phones (`TaskTracker.jsx`, `ContentCalendar.jsx`, `Clients.jsx`).
+* **Verified**: logged into the local mock-mode dev server (`.claude/launch.json` added for `/run`-style previews), scripted a sweep of all 9 sidebar pages at 375px/768px/1280px confirming `document.documentElement.scrollWidth` never exceeds `window.innerWidth` (zero horizontal overflow), and confirmed drawer open/close + modal-overlay full-viewport positioning via `getBoundingClientRect()`.
+* **Status**: ✅ Done, committed, pushed.
+
+### Problem 6 — Login page used a placeholder icon instead of the real logo
+
+* **Fix**: [`src/components/Login.jsx`](src/components/Login.jsx) now renders `<img src="/logo.png">` (same brand logo used in the app sidebar) instead of the two CSS `clipPath` diamond shapes that were standing in for it. Removed the now-unused `logoIcon`/`logoBluePrism`/`logoGoldPrism` style entries.
+* **Status**: ✅ Done, committed, pushed.
+
+### Problem 7 — "Creation failed: email rate limit exceeded" in Manage Roles
+
+* **Cause**: [`Add New Team Member Account`](src/App.jsx:294) calls `supabase.auth.signUp()` for every new teammate. Supabase's **default built-in email sender** (used when no custom SMTP is configured) sends a confirmation email per signup and caps that at roughly 2–4 emails/hour — it's meant for testing only, not real usage. Creating several accounts back-to-back (Bishwa, Chathura, Tharushka, then Seneth) hit that cap.
+* **Side effect users should know about**: while "Confirm email" is required, any account created *before* hitting the rate limit still can't log in until someone clicks a confirmation link — which never arrives, since no real email service is connected. Some already-created accounts may be stuck.
+* **This is a Supabase project dashboard setting, not something fixable in the app code.** Recommended fix (user needs to do this in the Supabase dashboard, not in this repo):
+  1. **Authentication → Providers → Email → turn OFF "Confirm email".** Since the admin sets the password directly when creating the account, no confirmation step is needed — this also permanently removes the rate-limit problem because Supabase stops trying to send any email for signups.
+  2. If real auth emails are wanted later (password reset, etc.), connect a **custom SMTP** under Authentication → Settings → SMTP Settings (e.g. Resend, SendGrid, Postmark) instead of relying on Supabase's default sender.
+* **Status**: ⚠️ Explained to user; **not yet toggled in the Supabase dashboard** — this cannot be done from the codebase/CLI, only from the Supabase project's web dashboard by someone with access.
 
 ## 4. Git status (as of end of this session)
 
-* Local `main` (in `D:\Gloma CRM`), newest first:
-  * `c641632` Move Team Members and Manage Roles out of System Settings into main sidebar tabs (Team visible to all users)
-  * `2e0691a` Add SQL: backfill profiles, signup trigger, and RLS policies for team directory visibility
-  * `92333f7` Add SQL migration: missing profiles/system_settings columns (fixes language column schema-cache error)
-  * `0a25914` Update CRM_SUMMARY.md with full session hand-off context
-  * `5498d27` Fix favicon: replace mislabeled PNG with valid SVG (Gloma gem mark)
-* Remote `origin/main` on GitHub: still at `5498d27` → **4 local commits have NOT been pushed yet.**
+* `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
 * Git identity on this machine: `Gloma Developer <capcutproforeveryone@gmail.com>`.
-
-### ⚠️ PENDING ACTION — push to GitHub
-
-* Pushing as GitHub user `bishwaww` fails with 403 (no write access to the org repo). The push must authenticate as `glomaint2025-ctrl`.
-* The earlier `PUSH_TO_GITHUB.bat` one-click script (with an embedded PAT) has already been used and self-deleted — it is **no longer in the folder**.
-* To push now: create a new PAT (glomaint2025-ctrl → GitHub Settings → Developer settings → Personal access tokens → classic, `repo` scope) and run in the project folder:
-  ```
-  git push https://x-access-token:YOUR_TOKEN@github.com/glomaint2025-ctrl/gloma-crm.git main:main
-  ```
-* Security: any previously shared PAT should be revoked on GitHub once no longer needed.
+* Pushing as GitHub user `bishwaww` fails with 403 (no write access to the org repo) — pushes this session authenticated as `glomaint2025-ctrl` via a manually generated classic PAT (`repo` scope), pasted into chat and used directly in the push URL. **That PAT has been shared in this chat multiple times and should be revoked** (`github.com/settings/tokens`) and a fresh one generated for next time.
+* `.claude/launch.json` was added (untracked, not committed) so `npm run dev` can be previewed via the `run`/browser-preview tooling — safe to keep or delete, has no effect on the deployed app.
 
 ### Note for AI assistants in cloud sandboxes
 
@@ -113,10 +133,10 @@ Cloud-session git operations on the mounted folder repeatedly leave `.git/*.lock
 
 ## 5. Next steps / open items
 
-1. **Push to GitHub** — generate a fresh PAT for `glomaint2025-ctrl` and run the push command in Section 4 → verify GitHub `main` reaches `c641632` or newer → wait for Vercel deploy → hard refresh (Ctrl+F5) → confirm the new Team/Manage Roles sidebar tabs appear on https://gloma-crm.vercel.app.
-2. Run the diagnostic query in `supabase_fix_team_visibility.sql` (`select count(*) from auth.users;`) to confirm whether real teammates exist yet; if the count is 1, add real accounts via **Manage Roles → Add New Team Member Account** (not by trying to "restore" the old sandbox demo names — those were never real accounts).
-3. Revoke any shared PAT on GitHub after a successful push.
-4. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM`.
+1. **Disable "Confirm email" in the Supabase dashboard** (Authentication → Providers → Email) — see Problem 7. This is the top open item; it's blocking reliable team-member account creation and can only be done by someone with Supabase dashboard access, not from this repo.
+2. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
+3. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
+4. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
 5. Optional: consider whether `supabase_fix_profiles.sql` / `supabase_fix_team_visibility.sql` should be moved into a `supabase/migrations/` folder for cleanliness now that there are three SQL files in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
 
 ## 6. Template prompt for a new AI chat
