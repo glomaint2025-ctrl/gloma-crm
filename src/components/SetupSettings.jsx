@@ -131,7 +131,43 @@ export default function SetupSettings({
   const isDev = userRole === 'Developer';
   const isAdminOrDev = userRole === 'Developer' || userRole === 'Admin';
 
+  const allRolesList = [
+    { value: 'Employee', label: 'Employee (Logs only)' },
+    { value: 'Editor', label: 'Editor' },
+    { value: 'Social Media Executive', label: 'Social Media Executive' },
+    { value: 'SMM & Developer', label: 'SMM & Developer' },
+    { value: 'Accountant', label: 'Accountant' },
+    { value: 'Coordinator', label: 'Coordinator' },
+    { value: 'Marketing Executive', label: 'Marketing Executive' },
+    { value: 'Manager', label: 'Manager' },
+    { value: 'Admin', label: 'Admin' },
+    { value: 'Developer', label: 'Developer' }
+  ];
+
+  const adminRolesList = [
+    { value: 'Admin', label: 'Admin' },
+    { value: 'Editor', label: 'Editor' },
+    { value: 'Developer', label: 'Developer' },
+    { value: 'SMM & Developer', label: 'SMM & Developer' },
+    { value: 'Accountant', label: 'Accountant' },
+    { value: 'Manager', label: 'Manager' }
+  ];
+
+  const getSelectableRoles = (currentRole) => {
+    let list = [];
+    if (userRole === 'Developer') {
+      list = [...allRolesList];
+    } else if (userRole === 'Admin') {
+      list = [...adminRolesList];
+    }
+    if (!list.some(r => r.value === currentRole)) {
+      list.unshift({ value: currentRole, label: currentRole });
+    }
+    return list;
+  };
+
   const driveWorkspace = {
+
     rootName: "Gloma International – Team Work Tracker Workspace",
     rootLink: "https://drive.google.com/open?id=1gvnXgvKWVV_SfsrSCIj5jeO1ysO_uI8k",
     devinWorks: "https://drive.google.com/open?id=1ntEUrorN4r3IzAU_G-aaSIGOpVbexE8T",
@@ -143,14 +179,11 @@ export default function SetupSettings({
       alert('Only Admins or Developers can manage security roles.');
       return;
     }
-    // Admins cannot change roles to Developer
-    if (userRole === 'Admin' && newRole === 'Developer') {
-      alert('Admin accounts cannot promote users to Developer.');
-      return;
-    }
+    // Admins are allowed to assign select roles (including Developer) as configured
     onUpdateProfileRole(profileId, newRole);
     alert(t.confirmRoleUpdate);
   };
+
 
   const handleSaveDevPrefs = (e) => {
     e.preventDefault();
@@ -446,16 +479,13 @@ export default function SetupSettings({
                                 onChange={(e) => handleRoleChange(p.id, e.target.value)}
                                 style={styles.roleSelect}
                               >
-                                <option value="Employee">Employee (Logs only)</option>
-                                <option value="Editor">Editor</option>
-                                <option value="Social Media Executive">Social Media Executive</option>
-                                <option value="SMM & Developer">SMM & Developer</option>
-                                <option value="Accountant">Accountant</option>
-                                <option value="Coordinator">Coordinator</option>
-                                <option value="Marketing Executive">Marketing Executive</option>
-                                <option value="Admin">Admin</option>
-                                {isDev && <option value="Developer">Developer</option>}
+                                {getSelectableRoles(p.role).map((roleOpt) => (
+                                  <option key={roleOpt.value} value={roleOpt.value}>
+                                    {roleOpt.label}
+                                  </option>
+                                ))}
                               </select>
+
                             )}
                           </td>
                         </tr>
