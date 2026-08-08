@@ -157,7 +157,7 @@ export default function TaskTracker({
   const [dueDate, setDueDate] = useState('');
 
   const userRole = currentUserProfile?.role || 'Employee';
-  const hasAssignPrivilege = userRole === 'Developer' || userRole === 'Admin';
+  const hasAssignPrivilege = userRole === 'Developer' || userRole === 'Admin' || userRole === 'Manager';
   const hasDeletePrivilege = userRole === 'Developer';
 
   // Apply filters
