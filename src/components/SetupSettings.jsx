@@ -11,7 +11,9 @@ import {
   Palette,
   Type,
   Globe,
-  Users
+  Users,
+  UserPlus,
+  Key
 } from 'lucide-react';
 import { isUsingMock } from '../supabaseClient';
 
@@ -118,6 +120,8 @@ export default function SetupSettings({
   onUpdateProfileRole, 
   onSaveGlobalSettings,
   onImportBulkData,
+  onUpdateProfileDetails,
+  onCreateMemberAccount,
   lang = 'en'
 }) {
   const t = localTranslations[lang] || localTranslations.en;
@@ -130,6 +134,136 @@ export default function SetupSettings({
   const [selTheme, setSelTheme] = useState(globalSettings.theme || 'dark');
   const [selFont, setSelFont] = useState(globalSettings.font_size || 'normal');
   const [selColor, setSelColor] = useState(globalSettings.primary_color || '#d4af37');
+
+  const [profileName, setProfileName] = useState(currentUserProfile?.full_name || '');
+  const [profileLang, setProfileLang] = useState(currentUserProfile?.language || 'en');
+  const [profileAvatar, setProfileAvatar] = useState(currentUserProfile?.avatar_url || '');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [avatarError, setAvatarError] = useState('');
+  const [profileMsg, setProfileMsg] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // New member account registration states
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberPassword, setNewMemberPassword] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('Employee');
+  const [newMemberMsg, setNewMemberMsg] = useState({ text: '', type: '' });
+  const [isCreatingMember, setIsCreatingMember] = useState(false);
+
+  // Password editing states for Developer
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [editingUserPassword, setEditingUserPassword] = useState('');
+
+  React.useEffect(() => {
+    if (currentUserProfile) {
+      setProfileName(currentUserProfile.full_name || '');
+      setProfileLang(currentUserProfile.language || 'en');
+      setProfileAvatar(currentUserProfile.avatar_url || '');
+    }
+  }, [currentUserProfile]);
+
+  const handleSaveProfileDetails = async (e) => {
+    e.preventDefault();
+    if (!profileName.trim()) {
+      setProfileMsg('Please enter a valid full name.');
+      return;
+    }
+    
+    setIsSavingProfile(true);
+    setProfileMsg('');
+    
+    const updates = {
+      full_name: profileName,
+      language: profileLang,
+      avatar_url: profileAvatar
+    };
+    
+    if (newPassword) {
+      if (newPassword !== confirmPassword) {
+        setProfileMsg('New passwords do not match!');
+        setIsSavingProfile(false);
+        return;
+      }
+      if (newPassword.length < 6) {
+        setProfileMsg('Password must be at least 6 characters long.');
+        setIsSavingProfile(false);
+        return;
+      }
+      updates.password = newPassword;
+    }
+    
+    if (onUpdateProfileDetails) {
+      const res = await onUpdateProfileDetails(currentUserProfile.id, updates);
+      if (res && res.success) {
+        setProfileMsg('Profile settings updated successfully!');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setProfileMsg(`Failed to update profile: ${res?.error || 'Unknown error'}`);
+      }
+    } else {
+      setProfileMsg('Profile updater not configured.');
+    }
+    setIsSavingProfile(false);
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError('File is too large! Maximum limit is 2MB.');
+      return;
+    }
+    
+    setAvatarError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      setProfileAvatar(reader.result);
+    };
+    reader.onerror = () => {
+      setAvatarError('Failed to read image file.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreateMemberSubmit = async (e) => {
+    e.preventDefault();
+    if (!newMemberEmail || !newMemberName || !newMemberPassword) {
+      setNewMemberMsg({ text: 'Please fill out all fields.', type: 'error' });
+      return;
+    }
+    if (newMemberPassword.length < 6) {
+      setNewMemberMsg({ text: 'Password must be at least 6 characters long.', type: 'error' });
+      return;
+    }
+    
+    setIsCreatingMember(true);
+    setNewMemberMsg({ text: '', type: '' });
+    
+    if (onCreateMemberAccount) {
+      const res = await onCreateMemberAccount({
+        email: newMemberEmail,
+        fullName: newMemberName,
+        password: newMemberPassword,
+        role: newMemberRole
+      });
+      if (res && res.success) {
+        setNewMemberMsg({ text: 'Account created and profile initialized successfully!', type: 'success' });
+        setNewMemberEmail('');
+        setNewMemberName('');
+        setNewMemberPassword('');
+        setNewMemberRole('Employee');
+      } else {
+        setNewMemberMsg({ text: `Creation failed: ${res?.error || 'Unknown error code'}`, type: 'error' });
+      }
+    } else {
+      setNewMemberMsg({ text: 'Account creator callback function not verified.', type: 'error' });
+    }
+    setIsCreatingMember(false);
+  };
 
   const userRole = currentUserProfile?.role || 'Employee';
   const isDev = userRole === 'Developer';
@@ -326,6 +460,10 @@ export default function SetupSettings({
         
         {/* Settings Left-Sidebar */}
         <div className="glass-panel" style={styles.sidebar}>
+          <div style={{ padding: '8px 8px 16px 8px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '12px' }}>
+            <img src="/logo.png" alt="Gloma" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+            <span style={{ fontWeight: '800', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)', letterSpacing: '0.05em' }}>PREFERENCES</span>
+          </div>
           {renderMenuItem('profile', <User size={16} />, t.menuProfile)}
           {renderMenuItem('drive', <Folder size={16} />, t.menuWorkspace)}
           
@@ -348,28 +486,154 @@ export default function SetupSettings({
           {activeTab === 'profile' && (
             <div>
               <h3 style={styles.tabTitle}>{t.titleProfile}</h3>
-              <div style={styles.profileCard}>
-                <img 
-                  src={currentUserProfile?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUserProfile?.full_name}`} 
-                  alt="" 
-                  style={styles.profileAvatar} 
-                />
-                <div>
-                  <h4 style={{ fontSize: 'var(--font-size-lg)', color: 'var(--color-gold)', fontWeight: 'bold' }}>{currentUserProfile?.full_name}</h4>
-                  <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>{currentUserProfile?.email}</p>
-                  
-                  <div style={styles.roleTag(currentUserProfile?.role)}>
-                    <Shield size={11} /> {currentUserProfile?.role}
+              
+              <form onSubmit={handleSaveProfileDetails} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={styles.profileCard}>
+                  <div style={{ position: 'relative' }}>
+                    <img 
+                      src={profileAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${profileName}`} 
+                      alt="" 
+                      style={styles.profileAvatar} 
+                    />
+                    <label style={styles.uploaderOverlay}>
+                      <Upload size={14} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleAvatarChange} 
+                        style={{ display: 'none' }} 
+                      />
+                    </label>
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: 'var(--font-size-lg)', color: 'var(--color-gold)', fontWeight: 'bold' }}>
+                      {profileName || currentUserProfile?.full_name}
+                    </h4>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      {currentUserProfile?.email}
+                    </p>
+                    <div style={styles.roleTag(currentUserProfile?.role)}>
+                      <Shield size={11} /> {currentUserProfile?.role}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div style={styles.profileDetailsRow}>
-                <div style={styles.detailBox}>
-                  <strong>Connected Environment:</strong>
-                  <p>{isUsingMock ? 'Offline Simulator database storage' : 'Live Supabase API production server'}</p>
+                {avatarError && (
+                  <div style={{ color: '#ef4444', fontSize: 'var(--font-size-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>⚠</span> {avatarError}
+                  </div>
+                )}
+
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h4 style={{ fontSize: 'var(--font-size-md)', color: 'var(--color-text-primary)', fontWeight: '600', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', marginBottom: '8px' }}>
+                    Account Identity & Settings
+                  </h4>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                        Full Name
+                      </label>
+                      <input 
+                        type="text" 
+                        value={profileName} 
+                        onChange={(e) => setProfileName(e.target.value)} 
+                        className="form-input" 
+                        placeholder="Enter full name" 
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                        Preferred Interface Language
+                      </label>
+                      <select 
+                        value={profileLang} 
+                        onChange={(e) => setProfileLang(e.target.value)} 
+                        className="form-input"
+                      >
+                        <option value="en">English (default)</option>
+                        <option value="si">Sinhala Pack (සිංහල)</option>
+                        <option value="ta">Tamil Pack (தமிழ்)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                      Profile Photo Upload (Max 2MB)
+                    </label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleAvatarChange} 
+                      className="form-input" 
+                      style={{ padding: '7px' }}
+                    />
+                    <small style={{ color: 'var(--color-text-muted)', display: 'block', marginTop: '4px' }}>
+                      Tip: Upload a square avatar page. Image file size must be under 2MB.
+                    </small>
+                  </div>
                 </div>
-              </div>
+
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h4 style={{ fontSize: 'var(--font-size-md)', color: 'var(--color-text-primary)', fontWeight: '600', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', marginBottom: '8px' }}>
+                    Update Login Credentials
+                  </h4>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                        New Password
+                      </label>
+                      <input 
+                        type="password" 
+                        value={newPassword} 
+                        onChange={(e) => setNewPassword(e.target.value)} 
+                        className="form-input" 
+                        placeholder="Leave blank to keep current" 
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                        Confirm New Password
+                      </label>
+                      <input 
+                        type="password" 
+                        value={confirmPassword} 
+                        onChange={(e) => setConfirmPassword(e.target.value)} 
+                        className="form-input" 
+                        placeholder="Leave blank to keep current" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {profileMsg && (
+                  <div className="glass-panel" style={{ 
+                    padding: '12px 16px', 
+                    borderRadius: 'var(--radius-sm)', 
+                    backgroundColor: profileMsg.includes('successfully') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                    border: `1px solid ${profileMsg.includes('successfully') ? '#10b981' : '#ef4444'}`,
+                    color: profileMsg.includes('successfully') ? '#10b981' : '#ef4444',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: '600'
+                  }}>
+                    {profileMsg}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                    Sandbox: {isUsingMock ? 'Offline Simulator Database' : 'Live Supabase Connection'}
+                  </span>
+                  <button type="submit" className="btn-primary" disabled={isSavingProfile}>
+                    {isSavingProfile ? 'Saving Changes...' : 'Save Profile Changes'}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
@@ -483,10 +747,93 @@ export default function SetupSettings({
             <div>
               <h3 style={styles.tabTitle}>{t.titleRoles}</h3>
               <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 16 }}>
-                Assign authority levels to team members.
-                {isAdmin && ' Developer accounts are hidden from this view.'}
+                Assign authority levels and credentials to team members.
+                {isAdmin && ' Developer accounts are restricted and hidden from this view.'}
               </p>
-              
+
+              {/* Add New Member Account Form */}
+              <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h4 style={{ fontSize: 'var(--font-size-md)', color: 'var(--color-gold)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <UserPlus size={18} /> Add New Team Member Account
+                </h4>
+                
+                <form onSubmit={handleCreateMemberSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                      Full Name
+                    </label>
+                    <input 
+                      type="text" 
+                      value={newMemberName} 
+                      onChange={(e) => setNewMemberName(e.target.value)} 
+                      className="form-input" 
+                      placeholder="e.g. John Doe"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                      Email Address
+                    </label>
+                    <input 
+                      type="email" 
+                      value={newMemberEmail} 
+                      onChange={(e) => setNewMemberEmail(e.target.value)} 
+                      className="form-input" 
+                      placeholder="e.g. member@gloma.com"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                      Login Password
+                    </label>
+                    <input 
+                      type="password" 
+                      value={newMemberPassword} 
+                      onChange={(e) => setNewMemberPassword(e.target.value)} 
+                      className="form-input" 
+                      placeholder="At least 6 characters"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                      Assign Security Role
+                    </label>
+                    <select 
+                      value={newMemberRole} 
+                      onChange={(e) => setNewMemberRole(e.target.value)} 
+                      className="form-input"
+                    >
+                      {getSelectableRoles('Employee').filter(r => isDev || r.value !== 'Developer').map((r) => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                    <div>
+                      {newMemberMsg.text && (
+                        <span style={{ 
+                          fontSize: 'var(--font-size-sm)', 
+                          fontWeight: '600', 
+                          color: newMemberMsg.type === 'success' ? '#10b981' : '#ef4444' 
+                        }}>
+                          {newMemberMsg.text}
+                        </span>
+                      )}
+                    </div>
+                    <button type="submit" className="btn-primary" disabled={isCreatingMember}>
+                      {isCreatingMember ? 'Creating Account...' : 'Create Account'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
               <div className="table-container" style={{ border: 'none' }}>
                 <table className="data-table">
                   <thead>
@@ -495,6 +842,7 @@ export default function SetupSettings({
                       <th>Email ID</th>
                       <th>Current Role</th>
                       <th>Assign Role Authority</th>
+                      {isDev && <th>Security Password</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -535,6 +883,71 @@ export default function SetupSettings({
                             </select>
                           )}
                         </td>
+                        {isDev && (
+                          <td>
+                            {editingUserId === p.id ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <input 
+                                  type="text" 
+                                  value={editingUserPassword}
+                                  onChange={(e) => setEditingUserPassword(e.target.value)}
+                                  className="form-input"
+                                  style={{ width: '130px', padding: '4px 8px', fontSize: 'var(--font-size-sm)' }}
+                                />
+                                <button 
+                                  onClick={async () => {
+                                    if (!editingUserPassword.trim() || editingUserPassword.length < 6) {
+                                      alert('Password must be at least 6 characters.');
+                                      return;
+                                    }
+                                    const res = await onUpdateProfileDetails(p.id, { password: editingUserPassword });
+                                    if (res && res.success) {
+                                      alert('Password updated successfully!');
+                                      setEditingUserId(null);
+                                    } else {
+                                      alert(`Failed to save: ${res?.error || 'Unknown error'}`);
+                                    }
+                                  }}
+                                  className="btn-primary"
+                                  style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }}
+                                >
+                                  Save
+                                </button>
+                                <button 
+                                  onClick={() => setEditingUserId(null)}
+                                  className="btn-secondary"
+                                  style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <code style={{ 
+                                  backgroundColor: 'rgba(212, 175, 55, 0.1)', 
+                                  padding: '3px 6px', 
+                                  borderRadius: '4px',
+                                  fontFamily: 'monospace',
+                                  color: 'var(--color-gold)',
+                                  fontSize: 'var(--font-size-sm)',
+                                  border: '1px solid rgba(212, 175, 55, 0.2)'
+                                }}>
+                                  {p.password || 'password123'}
+                                </code>
+                                <button 
+                                  onClick={() => {
+                                    setEditingUserId(p.id);
+                                    setEditingUserPassword(p.password || 'password123');
+                                  }}
+                                  className="btn-secondary"
+                                  style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-xs)' }}
+                                >
+                                  Change
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -686,6 +1099,23 @@ const styles = {
     borderRadius: 'var(--radius-full)',
     objectFit: 'cover',
     border: '2px solid var(--color-gold)'
+  },
+  uploaderOverlay: {
+    position: 'absolute',
+    bottom: '0',
+    right: '0',
+    backgroundColor: 'var(--color-gold)',
+    color: '#000',
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    border: '2px solid var(--border-subtle)',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
   },
   roleTag: (role) => {
     const isDevRole = role === 'Developer';

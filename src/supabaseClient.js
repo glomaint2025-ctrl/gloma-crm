@@ -25,28 +25,36 @@ const defaultProfiles = [
     email: 'capcutproforeveryone@gmail.com',
     full_name: 'Lead Developer',
     role: 'Developer',
-    avatar_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop&crop=faces'
+    avatar_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop&crop=faces',
+    password: 'password123',
+    language: 'en'
   },
   {
     id: 'admin-uuid-1',
     email: 'admin@gloma.com',
     full_name: 'Bishwa Admin',
     role: 'Admin',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces'
+    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces',
+    password: 'password123',
+    language: 'en'
   },
   {
     id: 'editor-uuid-1',
     email: 'devin@gloma.com',
     full_name: 'Devin Editor',
     role: 'Editor',
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
+    password: 'password123',
+    language: 'en'
   },
   {
     id: 'sme-uuid-1',
     email: 'sme@gloma.com',
     full_name: 'Sanjeewa SME',
     role: 'Social Media Executive',
-    avatar_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=faces'
+    avatar_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=faces',
+    password: 'password123',
+    language: 'en'
   }
 ];
 
@@ -128,7 +136,9 @@ const defaultSystemSettings = [
 // Initialize LocalStorage if empty/outdated
 if (isUsingMock) {
   // Always reload key stores if profiles are old layout to prevent crashes
-  const forceReload = !localStorage.getItem('gloma_profiles') || !localStorage.getItem('gloma_profiles').includes('capcutproforeveryone');
+  const forceReload = !localStorage.getItem('gloma_profiles') || 
+                      !localStorage.getItem('gloma_profiles').includes('capcutproforeveryone') ||
+                      !localStorage.getItem('gloma_profiles').includes('password');
   
   if (forceReload) {
     localStorage.setItem('gloma_profiles', JSON.stringify(defaultProfiles));
@@ -184,7 +194,9 @@ const mockClient = {
         email,
         full_name: fullName,
         role,
-        avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${fullName}`
+        avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${fullName}`,
+        password: password || 'password123',
+        language: 'en'
       };
       
       profiles.push(newProfile);
@@ -200,6 +212,11 @@ const mockClient = {
       const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
       
       if (!user) {
+        return { data: null, error: new Error('Invalid email or password') };
+      }
+
+      const matchPassword = user.password || 'password123';
+      if (password && password !== matchPassword) {
         return { data: null, error: new Error('Invalid email or password') };
       }
 

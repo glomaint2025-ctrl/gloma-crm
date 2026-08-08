@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { supabase, isUsingMock } from './supabaseClient';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -80,7 +81,7 @@ export default function App() {
   
   const [loading, setLoading] = useState(true);
 
-  const lang = globalSettings?.language || 'en';
+  const lang = currentUserProfile?.language || globalSettings?.language || 'en';
   const sbT = sidebarTranslations[lang] || sidebarTranslations.en;
 
   // Authenticate and load session
@@ -213,6 +214,109 @@ export default function App() {
       await refreshData();
     } catch (err) {
       console.error('Error updating role:', err);
+    }
+  };
+
+  const handleUpdateProfileDetails = async (profileId, updates) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', profileId);
+
+      if (error) throw error;
+
+      if (updates.password && !isUsingMock && currentUserProfile?.id === profileId) {
+        const { error: authErr } = await supabase.auth.updateUser({ password: updates.password });
+        if (authErr) throw authErr;
+      }
+
+      if (currentUserProfile?.id === profileId) {
+        await loadUserProfile(profileId, currentUserProfile.email);
+      } else {
+        await refreshData();
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating profile details:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleCreateMemberAccount = async ({ email, fullName, password, role }) => {
+    try {
+      if (isUsingMock) {
+        const localStorageProfiles = JSON.parse(localStorage.getItem('gloma_profiles') || '[]');
+        const emailExists = localStorageProfiles.some(p => p.email.toLowerCase() === email.toLowerCase());
+        if (emailExists) {
+          throw new Error('User already exists in profiles system.');
+        }
+        
+        const newUserId = 'mock-user-' + Math.random().toString(36).substr(2, 9);
+        const newProfile = {
+          id: newUserId,
+          email: email.toLowerCase(),
+          full_name: fullName,
+          role: role,
+          password: password,
+          language: 'en',
+          avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${fullName}`
+        };
+        
+        localStorageProfiles.push(newProfile);
+        localStorage.setItem('gloma_profiles', JSON.stringify(localStorageProfiles));
+        await refreshData();
+        return { success: true };
+      } else {
+        const tempSupabase = createClient(
+          import.meta.env.VITE_SUPABASE_URL,
+          import.meta.env.VITE_SUPABASE_ANON_KEY,
+          {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false
+            }
+          }
+        );
+        
+        const { data, error } = await tempSupabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              role: role
+            }
+          }
+        });
+        
+        if (error) throw error;
+        
+        if (data.user) {
+          const { error: profileErr } = await supabase
+            .from('profiles')
+            .update({ password: password, language: 'en' })
+            .eq('id', data.user.id);
+          
+          if (profileErr) {
+             await supabase.from('profiles').insert({
+               id: data.user.id,
+               email: email.toLowerCase(),
+               full_name: fullName,
+               role: role,
+               password: password,
+               language: 'en',
+               avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${fullName}`
+             });
+          }
+        }
+        
+        await refreshData();
+        return { success: true };
+      }
+    } catch (err) {
+      console.error('Error creating member account:', err);
+      return { success: false, error: err.message };
     }
   };
 
@@ -406,10 +510,7 @@ export default function App() {
         
         {/* Branding header */}
         <div style={styles.sidebarBrand}>
-          <div style={styles.logoIcon}>
-            <div style={styles.logoBluePrism}></div>
-            <div style={styles.logoGoldPrism}></div>
-          </div>
+          <img src="/logo.png" alt="Gloma Logo" style={styles.logoImage} />
           <div>
             <div style={styles.brandTitle}>GLOMA</div>
             <div style={styles.brandSubtitle}>CRM PORTAL</div>
@@ -579,6 +680,8 @@ export default function App() {
             onUpdateProfileRole={handleUpdateProfileRole}
             onSaveGlobalSettings={handleSaveGlobalSettings}
             onImportBulkData={handleImportBulkData}
+            onUpdateProfileDetails={handleUpdateProfileDetails}
+            onCreateMemberAccount={handleCreateMemberAccount}
             lang={lang}
           />
         )}
@@ -631,30 +734,10 @@ const styles = {
     padding: '0 8px',
     gap: '12px'
   },
-  logoIcon: {
-    display: 'flex',
-    position: 'relative',
+  logoImage: {
     width: '38px',
-    height: '38px'
-  },
-  logoBluePrism: {
-    position: 'absolute',
-    top: 3,
-    left: 3,
-    width: '24px',
-    height: '32px',
-    backgroundColor: '#0c1a30',
-    clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-    border: '1px solid var(--bg-translucent-white)'
-  },
-  logoGoldPrism: {
-    position: 'absolute',
-    top: 9,
-    left: 15,
-    width: '18px',
-    height: '24px',
-    backgroundColor: '#D4AF37',
-    clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)'
+    height: '38px',
+    objectFit: 'contain'
   },
   brandTitle: {
     fontFamily: 'var(--font-heading)',
