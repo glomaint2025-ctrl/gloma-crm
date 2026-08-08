@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { 
   User, 
@@ -6,30 +6,31 @@ import {
   Folder, 
   Upload, 
   Shield, 
-  Database, 
-  AlertTriangle, 
   Check, 
   FileSpreadsheet,
   Palette,
   Type,
-  Globe
+  Globe,
+  Users
 } from 'lucide-react';
-import { isUsingMock, supabase } from '../supabaseClient';
+import { isUsingMock } from '../supabaseClient';
 
 const localTranslations = {
   en: {
     menuProfile: "My Account Profile",
     menuWorkspace: "G-Drive Workspace",
     menuExcel: "Excel Tracker Import",
-    menuSecurity: "Member Role Roster",
+    menuTeam: "Team Members",
+    menuRoles: "Manage Roles",
     menuDevConsole: "Developer Preferences",
     titleProfile: "My Account Profile",
     titleWorkspace: "Google Drive Workspaces",
     titleExcel: "Excel Spreadsheet Ingest",
-    titleSecurity: "Team Security & Roster",
+    titleTeam: "Team Members Directory",
+    titleRoles: "Role Assignment Panel",
     titleDevConsole: "Global CRM Visual Preferences",
     roleLabel: "Security Role Rank:",
-    themeMode: "System color Mode:",
+    themeMode: "System Color Mode:",
     langLabel: "Active Language Pack:",
     fontLabel: "Baseline Font Scale:",
     primaryColorLabel: "Global Color Accent:",
@@ -50,12 +51,14 @@ const localTranslations = {
     menuProfile: "මගේ පැතිකඩ",
     menuWorkspace: "ගූගල් ඩ්‍රයිව් වැඩබිම",
     menuExcel: "එක්සෙල් ගොනු ආනයනය",
-    menuSecurity: "සේවක අවසර මට්ටම්",
-    menuDevConsole: "පද්ධති සැකසුම් (Developer)",
+    menuTeam: "කණ්ඩායම් සාමාජිකයින්",
+    menuRoles: "අවසර මට්ටම් කළමනාකරණය",
+    menuDevConsole: "පද්ධති සැකසුම්",
     titleProfile: "මගේ ගිණුම් පැතිකඩ",
     titleWorkspace: "ගූගල් ඩ්‍රයිව් ෆෝල්ඩර",
     titleExcel: "එක්සෙල් දත්ත ඇතුලත් කිරීම",
-    titleSecurity: "ආරක්ෂක අවසර මට්ටම් පාලනය",
+    titleTeam: "කණ්ඩායම් සාමාජික නාමාවලිය",
+    titleRoles: "අවසර මට්ටම් පැවරීම",
     titleDevConsole: "පද්ධති වර්ණ සහ භාෂා සැකසුම්",
     roleLabel: "අවසර මට්ටම:",
     themeMode: "වර්ණ තේමාව (Dark/Light):",
@@ -79,12 +82,14 @@ const localTranslations = {
     menuProfile: "எனது சுயவிவரம்",
     menuWorkspace: "கூகிள் டிரைவ் தளம்",
     menuExcel: "எக்செல் இறக்குமதி",
-    menuSecurity: "ஊழியர் அனுமதிகள்",
+    menuTeam: "குழு உறுப்பினர்கள்",
+    menuRoles: "பாத்திர நிர்வாகம்",
     menuDevConsole: "டெவலப்பர் அமைப்புகள்",
     titleProfile: "எனது கணக்கு சுயவிவரம்",
     titleWorkspace: "கூகிள் டிரைவ் கோப்புகள்",
     titleExcel: "எக்செல் தரவு இறக்குமதி",
-    titleSecurity: "பாதுகாப்பு மற்றும் அனுமதிகள்",
+    titleTeam: "குழு உறுப்பினர் பட்டியல்",
+    titleRoles: "பாத்திர ஒதுக்கீடு",
     titleDevConsole: "கணினி வண்ணங்கள் மற்றும் மொழி அமைப்புகள்",
     roleLabel: "அனுமதி நிலை:",
     themeMode: "தீம் முறைமை (Dark/Light):",
@@ -121,7 +126,6 @@ export default function SetupSettings({
   const [importing, setImporting] = useState(false);
   const [importStats, setImportStats] = useState(null);
 
-  // Developer Preferences Panel states
   const [selLang, setSelLang] = useState(globalSettings.language || 'en');
   const [selTheme, setSelTheme] = useState(globalSettings.theme || 'dark');
   const [selFont, setSelFont] = useState(globalSettings.font_size || 'normal');
@@ -129,8 +133,10 @@ export default function SetupSettings({
 
   const userRole = currentUserProfile?.role || 'Employee';
   const isDev = userRole === 'Developer';
-  const isAdminOrDev = userRole === 'Developer' || userRole === 'Admin';
+  const isAdmin = userRole === 'Admin';
+  const isAdminOrDev = isDev || isAdmin;
 
+  // Full list available to Developer only
   const allRolesList = [
     { value: 'Employee', label: 'Employee (Logs only)' },
     { value: 'Editor', label: 'Editor' },
@@ -144,20 +150,24 @@ export default function SetupSettings({
     { value: 'Developer', label: 'Developer' }
   ];
 
+  // Admin restricted list: no Developer option
   const adminRolesList = [
-    { value: 'Admin', label: 'Admin' },
+    { value: 'Employee', label: 'Employee (Logs only)' },
     { value: 'Editor', label: 'Editor' },
-    { value: 'Developer', label: 'Developer' },
+    { value: 'Social Media Executive', label: 'Social Media Executive' },
     { value: 'SMM & Developer', label: 'SMM & Developer' },
     { value: 'Accountant', label: 'Accountant' },
-    { value: 'Manager', label: 'Manager' }
+    { value: 'Coordinator', label: 'Coordinator' },
+    { value: 'Marketing Executive', label: 'Marketing Executive' },
+    { value: 'Manager', label: 'Manager' },
+    { value: 'Admin', label: 'Admin' }
   ];
 
   const getSelectableRoles = (currentRole) => {
     let list = [];
-    if (userRole === 'Developer') {
+    if (isDev) {
       list = [...allRolesList];
-    } else if (userRole === 'Admin') {
+    } else if (isAdmin) {
       list = [...adminRolesList];
     }
     if (!list.some(r => r.value === currentRole)) {
@@ -166,9 +176,14 @@ export default function SetupSettings({
     return list;
   };
 
-  const driveWorkspace = {
+  // Filter profiles: hide Developer from non-Developer users
+  const visibleProfiles = profiles.filter(p => {
+    if (isDev) return true;
+    return p.role !== 'Developer';
+  });
 
-    rootName: "Gloma International – Team Work Tracker Workspace",
+  const driveWorkspace = {
+    rootName: "Gloma International \u2013 Team Work Tracker Workspace",
     rootLink: "https://drive.google.com/open?id=1gvnXgvKWVV_SfsrSCIj5jeO1ysO_uI8k",
     devinWorks: "https://drive.google.com/open?id=1ntEUrorN4r3IzAU_G-aaSIGOpVbexE8T",
     bishwaWorks: "https://drive.google.com/open?id=1VJZjDb4lzJhJ5GPb9ygyZpevEd8fZJ94"
@@ -179,11 +194,13 @@ export default function SetupSettings({
       alert('Only Admins or Developers can manage security roles.');
       return;
     }
-    // Admins are allowed to assign select roles (including Developer) as configured
+    if (isAdmin && newRole === 'Developer') {
+      alert('Admin accounts cannot assign the Developer role.');
+      return;
+    }
     onUpdateProfileRole(profileId, newRole);
     alert(t.confirmRoleUpdate);
   };
-
 
   const handleSaveDevPrefs = (e) => {
     e.preventDefault();
@@ -200,7 +217,6 @@ export default function SetupSettings({
     alert(t.saveSettings);
   };
 
-  // Convert Excel date serial to date string
   const formatExcelDate = (serial) => {
     if (!serial) return new Date().toISOString().split('T')[0];
     if (typeof serial === 'string') {
@@ -216,7 +232,6 @@ export default function SetupSettings({
     }
   };
 
-  // Excel importer
   const handleExcelUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -269,7 +284,6 @@ export default function SetupSettings({
                 else if (h === 'Final Delivery Link') taskObj.final_delivery_link = val || '';
               });
 
-              // Map
               const empProfile = profiles.find(p => p.full_name?.toLowerCase() === (taskObj.employee_name || '').toLowerCase());
               if (empProfile) {
                 taskObj.employee_id = empProfile.id;
@@ -292,52 +306,39 @@ export default function SetupSettings({
     reader.readAsBinaryString(file);
   };
 
+  const renderMenuItem = (tabKey, icon, label) => (
+    <div 
+      onClick={() => setActiveTab(tabKey)} 
+      style={{ 
+        ...styles.menuItem, 
+        color: activeTab === tabKey ? 'var(--color-gold)' : 'var(--color-text-primary)',
+        backgroundColor: activeTab === tabKey ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
+        borderLeft: activeTab === tabKey ? '3px solid var(--color-gold)' : '3px solid transparent'
+      }}
+    >
+      {icon} {label}
+    </div>
+  );
+
   return (
     <div style={styles.container} className="animate-fade-in">
       <div style={styles.tabGrid}>
         
         {/* Settings Left-Sidebar */}
         <div className="glass-panel" style={styles.sidebar}>
-          <div 
-            onClick={() => setActiveTab('profile')} 
-            style={{ ...styles.menuItem, color: activeTab === 'profile' ? 'var(--color-gold)' : 'var(--color-text-primary)' }}
-          >
-            <User size={16} /> {t.menuProfile}
-          </div>
+          {renderMenuItem('profile', <User size={16} />, t.menuProfile)}
+          {renderMenuItem('drive', <Folder size={16} />, t.menuWorkspace)}
           
-          <div 
-            onClick={() => setActiveTab('drive')} 
-            style={{ ...styles.menuItem, color: activeTab === 'drive' ? 'var(--color-gold)' : 'var(--color-text-primary)' }}
-          >
-            <Folder size={16} /> {t.menuWorkspace}
-          </div>
-          
-          {isAdminOrDev && (
-            <div 
-              onClick={() => setActiveTab('excel')} 
-              style={{ ...styles.menuItem, color: activeTab === 'excel' ? 'var(--color-gold)' : 'var(--color-text-primary)' }}
-            >
-              <Upload size={16} /> {t.menuExcel}
-            </div>
-          )}
+          {isAdminOrDev && renderMenuItem('excel', <Upload size={16} />, t.menuExcel)}
 
-          {isAdminOrDev && (
-            <div 
-              onClick={() => setActiveTab('security')} 
-              style={{ ...styles.menuItem, color: activeTab === 'security' ? 'var(--color-gold)' : 'var(--color-text-primary)' }}
-            >
-              <Shield size={16} /> {t.menuSecurity}
-            </div>
-          )}
+          {/* Team tab: visible to Developer + Admin */}
+          {isAdminOrDev && renderMenuItem('team', <Users size={16} />, t.menuTeam)}
 
-          {isDev && (
-            <div 
-              onClick={() => setActiveTab('devprefs')} 
-              style={{ ...styles.menuItem, color: activeTab === 'devprefs' ? 'var(--color-gold)' : 'var(--color-text-primary)' }}
-            >
-              <Settings size={16} /> {t.menuDevConsole}
-            </div>
-          )}
+          {/* Roles tab: visible to Developer + Admin */}
+          {isAdminOrDev && renderMenuItem('roles', <Shield size={16} />, t.menuRoles)}
+
+          {/* Developer Preferences: visible only to Developer */}
+          {isDev && renderMenuItem('devprefs', <Settings size={16} />, t.menuDevConsole)}
         </div>
 
         {/* Settings Body area */}
@@ -443,10 +444,48 @@ export default function SetupSettings({
             </div>
           )}
 
-          {/* SECURITY ROSTER (Dev/Admin view) */}
-          {activeTab === 'security' && (
+          {/* TEAM MEMBERS view (read-only directory) */}
+          {activeTab === 'team' && (
             <div>
-              <h3 style={styles.tabTitle}>{t.titleSecurity}</h3>
+              <h3 style={styles.tabTitle}>{t.titleTeam}</h3>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginBottom: 16 }}>
+                Overview of all registered team members and their current roles.
+              </p>
+              
+              <div style={styles.teamGrid}>
+                {visibleProfiles.map((p) => (
+                  <div key={p.id} style={styles.teamCard} className="glass-card-interactive">
+                    <img 
+                      src={p.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${p.full_name}`} 
+                      alt="" 
+                      style={styles.teamAvatar} 
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '600', fontSize: 14 }}>{p.full_name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.email}</div>
+                    </div>
+                    <div style={styles.roleTag(p.role)}>
+                      <Shield size={10} /> {p.role}
+                    </div>
+                  </div>
+                ))}
+                {visibleProfiles.length === 0 && (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    No team members registered yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ROLES ASSIGNMENT view (Admin + Developer) */}
+          {activeTab === 'roles' && isAdminOrDev && (
+            <div>
+              <h3 style={styles.tabTitle}>{t.titleRoles}</h3>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginBottom: 16 }}>
+                Assign authority levels to team members.
+                {isAdmin && ' Developer accounts are hidden from this view.'}
+              </p>
               
               <div className="table-container" style={{ border: 'none' }}>
                 <table className="data-table">
@@ -454,41 +493,49 @@ export default function SetupSettings({
                     <tr>
                       <th>Profile Member</th>
                       <th>Email ID</th>
+                      <th>Current Role</th>
                       <th>Assign Role Authority</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {profiles
-                      // SECURITY RULE: Hide Developer from Admin/Employee view
-                      .filter(p => userRole === 'Developer' || p.role !== 'Developer')
-                      .map((p) => (
-                        <tr key={p.id}>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <img src={p.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${p.full_name}`} alt="" style={{ width: 26, height: 26, borderRadius: '50%' }} />
-                              <span style={{ fontWeight: '600' }}>{p.full_name}</span>
-                            </div>
-                          </td>
-                          <td>{p.email}</td>
-                          <td>
-                            {p.id === currentUserProfile.id ? (
-                              <span style={{ fontWeight: 'bold', color: 'var(--color-gold)' }}>{p.role}</span>
-                            ) : (
-                              <select
-                                value={p.role}
-                                onChange={(e) => handleRoleChange(p.id, e.target.value)}
-                                style={styles.roleSelect}
-                              >
-                                {getSelectableRoles(p.role).map((roleOpt) => (
-                                  <option key={roleOpt.value} value={roleOpt.value}>
-                                    {roleOpt.label}
-                                  </option>
-                                ))}
-                              </select>
-
-                            )}
-                          </td>
-                        </tr>
+                    {visibleProfiles.map((p) => (
+                      <tr key={p.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <img 
+                              src={p.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${p.full_name}`} 
+                              alt="" 
+                              style={{ width: 30, height: 30, borderRadius: 'var(--radius-full)', border: '2px solid var(--border-subtle)' }} 
+                            />
+                            <span style={{ fontWeight: '600' }}>{p.full_name}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--color-text-secondary)' }}>{p.email}</td>
+                        <td>
+                          <div style={styles.roleTag(p.role)}>
+                            <Shield size={10} /> {p.role}
+                          </div>
+                        </td>
+                        <td>
+                          {p.id === currentUserProfile.id ? (
+                            <span style={{ fontWeight: 'bold', color: 'var(--color-gold)', fontSize: 13 }}>
+                              (Your Account)
+                            </span>
+                          ) : (
+                            <select
+                              value={p.role}
+                              onChange={(e) => handleRoleChange(p.id, e.target.value)}
+                              style={styles.roleSelect}
+                            >
+                              {getSelectableRoles(p.role).map((roleOpt) => (
+                                <option key={roleOpt.value} value={roleOpt.value}>
+                                  {roleOpt.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -503,7 +550,6 @@ export default function SetupSettings({
 
               <div style={styles.consoleGrid}>
                 
-                {/* Language Select */}
                 <div style={styles.prefField}>
                   <div style={styles.prefLabelBox}>
                     <Globe size={16} color="var(--color-gold)" />
@@ -520,7 +566,6 @@ export default function SetupSettings({
                   </select>
                 </div>
 
-                {/* Theme Select */}
                 <div style={styles.prefField}>
                   <div style={styles.prefLabelBox}>
                     <Palette size={16} color="var(--color-gold)" />
@@ -536,7 +581,6 @@ export default function SetupSettings({
                   </select>
                 </div>
 
-                {/* Font Size Select */}
                 <div style={styles.prefField}>
                   <div style={styles.prefLabelBox}>
                     <Type size={16} color="var(--color-gold)" />
@@ -553,7 +597,6 @@ export default function SetupSettings({
                   </select>
                 </div>
 
-                {/* Primary Color Accent Select */}
                 <div style={styles.prefField}>
                   <div style={styles.prefLabelBox}>
                     <Palette size={16} color="var(--color-gold)" />
@@ -595,16 +638,15 @@ const styles = {
   },
   tabGrid: {
     display: 'grid',
-    gridTemplateColumns: '240px 1fr',
+    gridTemplateColumns: '250px 1fr',
     gap: '20px',
     alignItems: 'start'
   },
   sidebar: {
-    padding: '16px',
-    backgroundColor: 'var(--bg-glass)',
+    padding: '12px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: '4px'
   },
   menuItem: {
     padding: '12px 14px',
@@ -615,17 +657,15 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    transition: 'all var(--transition-fast)',
-    backgroundColor: 'rgba(255,255,255,0.02)'
+    transition: 'all var(--transition-fast)'
   },
   contentBody: {
-    padding: '24px',
-    backgroundColor: 'var(--bg-glass)'
+    padding: '28px',
+    minHeight: '500px'
   },
   tabTitle: {
     fontSize: '17px',
     fontWeight: '700',
-    color: '#fff',
     marginBottom: '10px',
     borderBottom: '1px solid var(--border-subtle)',
     paddingBottom: '12px'
@@ -643,24 +683,24 @@ const styles = {
   profileAvatar: {
     width: '60px',
     height: '60px',
-    borderRadius: '50%',
+    borderRadius: 'var(--radius-full)',
     objectFit: 'cover',
     border: '2px solid var(--color-gold)'
   },
   roleTag: (role) => {
-    const isDev = role === 'Developer';
-    const isAdmin = role === 'Admin';
+    const isDevRole = role === 'Developer';
+    const isAdminRole = role === 'Admin';
     return {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '4px',
       fontSize: '11px',
       fontWeight: 'bold',
-      backgroundColor: isDev ? 'rgba(212, 175, 55, 0.15)' : isAdmin ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-      color: isDev ? 'var(--color-gold)' : isAdmin ? '#3B82F6' : '#fff',
-      padding: '2px 8px',
-      borderRadius: '4px',
-      marginTop: '6px'
+      backgroundColor: isDevRole ? 'rgba(212, 175, 55, 0.15)' : isAdminRole ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+      color: isDevRole ? 'var(--color-gold)' : isAdminRole ? '#3B82F6' : 'var(--color-text-secondary)',
+      padding: '3px 10px',
+      borderRadius: 'var(--radius-full)',
+      marginTop: '4px'
     };
   },
   profileDetailsRow: {
@@ -686,7 +726,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px',
-    borderRadius: 'var(--radius-sm)'
+    borderRadius: 'var(--radius-md)'
   },
   uploadArea: {
     display: 'flex',
@@ -710,14 +750,35 @@ const styles = {
     marginBottom: '20px',
     alignItems: 'center'
   },
+  teamGrid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
+  },
+  teamCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '14px 18px',
+    borderRadius: 'var(--radius-md)'
+  },
+  teamAvatar: {
+    width: '38px',
+    height: '38px',
+    borderRadius: 'var(--radius-full)',
+    objectFit: 'cover',
+    border: '2px solid var(--border-subtle)'
+  },
   roleSelect: {
-    padding: '6px',
-    backgroundColor: 'rgba(17,24,39,0.7)',
+    padding: '7px 12px',
+    backgroundColor: 'var(--bg-panel)',
     border: '1px solid var(--border-subtle)',
-    borderRadius: '4px',
-    color: '#fff',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--color-text-primary)',
     fontSize: '12px',
-    lineHeight: 1
+    lineHeight: 1.4,
+    cursor: 'pointer',
+    minWidth: '180px'
   },
   consoleForm: {
     display: 'flex',
