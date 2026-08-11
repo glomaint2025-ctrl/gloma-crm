@@ -18,7 +18,8 @@ export async function sendTaskAssignedEmail({
   workType,
   priority,
   dueDate,
-  assignedBy
+  assignedBy,
+  assignedByEmail
 }) {
   if (!toEmail) return;
 
@@ -41,7 +42,12 @@ export async function sendTaskAssignedEmail({
         priority: priority || 'Normal',
         due_date: dueDate || 'Not set',
         assigned_by: assignedBy || 'Gloma CRM Portal',
-        portal_url: 'https://gloma-crm.vercel.app'
+        portal_url: 'https://gloma-crm.vercel.app',
+        // The EmailJS template's "From Name" / "Reply To" fields are bound to
+        // {{name}} / {{email}} — without these the send fails since Reply To
+        // ends up empty/invalid.
+        name: assignedBy || 'Gloma CRM Portal',
+        email: assignedByEmail || 'no-reply@gloma-crm.vercel.app'
       },
       { publicKey: PUBLIC_KEY }
     );

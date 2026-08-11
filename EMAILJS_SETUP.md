@@ -20,8 +20,11 @@ This part has to be done by you in the EmailJS dashboard — I can't create acco
 ## Step 3 — Create the email template
 
 1. Dashboard → **Email Templates** → **Create New Template**.
-2. **Settings tab** → set **"To Email"** to `{{to_email}}` (this is what actually routes the email —
-   easy to miss).
+2. **Settings tab** — the "To Email" field defaults to `{{to_email}}`, which is correct, keep it.
+   **Also check "From Name" and "Reply To"** — EmailJS's default template pre-fills these with
+   `{{name}}` and `{{email}}`. The app *does* supply both of those (mapped to the assigner's name
+   and email), so leaving them as-is works. If you change them to some other variable name, the
+   send will silently fail — EmailJS rejects it when Reply To resolves to empty.
 3. **Content tab** → Subject:
    ```
    New Task Assigned: {{task_title}}

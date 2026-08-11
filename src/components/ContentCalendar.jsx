@@ -194,7 +194,8 @@ export default function ContentCalendar({
         workType,
         priority,
         dueDate: selectedCalendarDate,
-        assignedBy: currentUserProfile?.full_name
+        assignedBy: currentUserProfile?.full_name,
+        assignedByEmail: currentUserProfile?.email
       });
     }
   };

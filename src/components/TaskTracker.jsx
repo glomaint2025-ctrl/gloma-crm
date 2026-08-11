@@ -334,7 +334,8 @@ export default function TaskTracker({
         workType,
         priority: taskPriority,
         dueDate,
-        assignedBy: currentUserProfile?.full_name
+        assignedBy: currentUserProfile?.full_name,
+        assignedByEmail: currentUserProfile?.email
       });
     }
   };
