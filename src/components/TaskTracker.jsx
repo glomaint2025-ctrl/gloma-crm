@@ -486,12 +486,28 @@ export default function TaskTracker({
                     >
                       <div style={styles.cardHeader}>
                         <span style={styles.cardId}>{task.id}</span>
-                        <span style={{ 
-                          ...styles.cardPriority, 
-                          color: task.priority === 'High' ? 'var(--color-priority-high)' : task.priority === 'Normal' ? 'var(--color-priority-normal)' : 'var(--color-priority-low)'
-                        }}>
-                          {task.priority}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            ...styles.cardPriority,
+                            color: task.priority === 'High' ? 'var(--color-priority-high)' : task.priority === 'Normal' ? 'var(--color-priority-normal)' : 'var(--color-priority-low)'
+                          }}>
+                            {task.priority}
+                          </span>
+                          {hasDeletePrivilege && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(t.confirmDelete)) {
+                                  onDeleteTask(task.id);
+                                }
+                              }}
+                              style={styles.cardDeleteBtn}
+                              title="Delete task"
+                            >
+                              <Trash2 size={13} color="var(--color-cancelled)" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div style={styles.cardClient}>{task.client_project}</div>
@@ -1079,6 +1095,15 @@ const styles = {
     padding: '4px',
     display: 'flex',
     alignItems: 'center'
+  },
+  cardDeleteBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '2px',
+    display: 'flex',
+    alignItems: 'center',
+    flexShrink: 0
   },
   tableEmptyMessage: {
     textAlign: 'center',
