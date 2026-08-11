@@ -127,6 +127,16 @@ User request (Sinhala): "kauda online and last seen danna welawa... developerta 
 * **Verified** in local mock mode: simulated three other users' `last_seen` (30s ago → "Online now", 3h ago → "3h ago", never set → "Never logged in") and confirmed the Developer view renders all four states correctly; confirmed Admin sees the Manage Roles table with **no** Presence or Security Password column (both still Developer-only).
 * **Status**: ✅ Code done, committed, pushed. ⚠️ **SQL migration not yet run** — see Next steps.
 
+### Problem 9 — 'Developer' role was assignable to more than one account; naming confusion with 'SMM & Developer'
+
+User clarification (Sinhala): "Developer" should mean the single full-control owner account (`capcutproforeveryone@gmail.com` only) — hidden from Admin and everyone else, same as before. **"SMM & Developer" is a completely different, ordinary role** (a Web Developer employee, ranked below Admin/Manager like any other normal role) and should not be confused with it. The concrete bug: another real account (Tharushka) had ended up with the `Developer` role, which should never happen — only the owner account should ever hold it.
+
+* **UI fix**: [`src/components/ManageRoles.jsx`](src/components/ManageRoles.jsx) — removed `'Developer'` from `allRolesList` entirely, so it is **never offered as a selectable option**, either in the "Add New Team Member" role dropdown or the per-row role-change dropdown — not even by the Developer themselves. Relabeled `'SMM & Developer'` to `"SMM & Developer (Web Developer)"` to reduce naming confusion with the `Developer` role. The existing `getSelectableRoles()` fallback still unshifts a profile's **current** role into its dropdown if not otherwise in the list — so an already-mis-assigned `Developer` row (like Tharushka's) still shows up correctly for the real Developer to demote it to a real role, it just can never be (re)assigned to someone new.
+* **App-level guard (defense in depth)**: [`src/App.jsx`](src/App.jsx) — added `DEVELOPER_OWNER_EMAIL` + `guardDeveloperRole(role, email)`, applied in both `handleCreateMemberAccount` (mock + live branches) and `handleUpdateProfileRole`. Any attempt to set `role: 'Developer'` for an email other than the owner's is silently downgraded to `'Employee'` (with a `console.warn`), regardless of how the request reaches those functions.
+* **DB-level guard + one-time fix**: `supabase_lock_developer_role.sql` — (1) demotes any existing `profiles` row with `role = 'Developer'` whose email isn't the owner's back to `'Employee'` (this is what fixes Tharushka's account — **review and re-assign their real role afterward in Manage Roles**), and (2) adds a `before insert or update` trigger on `public.profiles` that raises an exception if anyone (including direct edits in the Supabase Table Editor) tries to set `role = 'Developer'` on a non-owner row.
+* **Verified** in local mock mode: seeded a fake mis-assigned `Developer` account, confirmed (a) it's invisible to Admin's Manage Roles view, (b) the real Developer can see it and demote it to a normal role via the dropdown, (c) `'Developer'` never appears as a choosable option for any other account in either the add-member or role-change dropdowns.
+* **Status**: ✅ Code done, committed, pushed. ⚠️ **`supabase_lock_developer_role.sql` not yet run** — required to actually demote Tharushka's live account and install the DB-level trigger; see Next steps.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
@@ -144,12 +154,13 @@ Cloud-session git operations on the mounted folder repeatedly leave `.git/*.lock
 
 ## 5. Next steps / open items
 
-1. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
-2. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
-3. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
-4. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
-5. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
-6. Optional: consider whether the four `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
+1. **Run `supabase_lock_developer_role.sql` in the Supabase SQL Editor** — demotes Tharushka's (and any other) wrongly-assigned `Developer` account back to `Employee` and installs the DB trigger that blocks it from happening again. **After running it, go to Manage Roles and re-assign Tharushka's actual intended role** (they'll show as `Employee` until then).
+2. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
+3. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
+4. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
+5. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
+6. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
+7. Optional: consider whether the five `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
 
 ## 6. Template prompt for a new AI chat
 

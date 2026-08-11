@@ -94,22 +94,24 @@ export default function ManageRoles({
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingUserPassword, setEditingUserPassword] = useState('');
 
-  // Full list available to Developer only
+  // 'Developer' is intentionally NOT in this list — it's the single full-control
+  // owner account (capcutproforeveryone@gmail.com) and must never be assignable
+  // to anyone else, not even by another Developer, via this UI. 'SMM & Developer'
+  // is an unrelated normal-tier role (Web Developer), below Admin and Manager.
   const allRolesList = [
     { value: 'Employee', label: 'Employee (Logs only)' },
     { value: 'Editor', label: 'Editor' },
     { value: 'Social Media Executive', label: 'Social Media Executive' },
-    { value: 'SMM & Developer', label: 'SMM & Developer' },
+    { value: 'SMM & Developer', label: 'SMM & Developer (Web Developer)' },
     { value: 'Accountant', label: 'Accountant' },
     { value: 'Coordinator', label: 'Coordinator' },
     { value: 'Marketing Executive', label: 'Marketing Executive' },
     { value: 'Manager', label: 'Manager' },
-    { value: 'Admin', label: 'Admin' },
-    { value: 'Developer', label: 'Developer' }
+    { value: 'Admin', label: 'Admin' }
   ];
 
-  // Admin restricted list: no Developer option
-  const adminRolesList = allRolesList.filter(r => r.value !== 'Developer');
+  // Admin restricted list: same as above (Developer already excluded)
+  const adminRolesList = allRolesList;
 
   const getSelectableRoles = (currentRole) => {
     let list = [];

@@ -71,6 +71,19 @@ const sidebarTranslations = {
   }
 };
 
+// Only this account may ever hold the 'Developer' role (full-control, hidden from
+// Admin and everyone else). 'SMM & Developer' is an unrelated, normal-tier employee
+// role (Web Developer) and is not affected by this restriction.
+const DEVELOPER_OWNER_EMAIL = 'capcutproforeveryone@gmail.com';
+
+const guardDeveloperRole = (role, email) => {
+  if (role === 'Developer' && (email || '').toLowerCase() !== DEVELOPER_OWNER_EMAIL) {
+    console.warn(`Blocked assigning 'Developer' role to ${email} — reserved for ${DEVELOPER_OWNER_EMAIL}.`);
+    return 'Employee';
+  }
+  return role;
+};
+
 export default function App() {
   const [sessionUser, setSessionUser] = useState(null);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
@@ -239,11 +252,14 @@ export default function App() {
 
   const handleUpdateProfileRole = async (profileId, newRole) => {
     try {
+      const targetProfile = profiles.find(p => p.id === profileId);
+      const safeRole = guardDeveloperRole(newRole, targetProfile?.email);
+
       await supabase
         .from('profiles')
-        .update({ role: newRole })
+        .update({ role: safeRole })
         .eq('id', profileId);
-      
+
       await refreshData();
     } catch (err) {
       console.error('Error updating role:', err);
@@ -277,6 +293,7 @@ export default function App() {
   };
 
   const handleCreateMemberAccount = async ({ email, fullName, password, role }) => {
+    const safeRole = guardDeveloperRole(role, email);
     try {
       if (isUsingMock) {
         const localStorageProfiles = JSON.parse(localStorage.getItem('gloma_profiles') || '[]');
@@ -284,13 +301,13 @@ export default function App() {
         if (emailExists) {
           throw new Error('User already exists in profiles system.');
         }
-        
+
         const newUserId = 'mock-user-' + Math.random().toString(36).substr(2, 9);
         const newProfile = {
           id: newUserId,
           email: email.toLowerCase(),
           full_name: fullName,
-          role: role,
+          role: safeRole,
           password: password,
           language: 'en',
           avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${fullName}`
@@ -318,25 +335,25 @@ export default function App() {
           options: {
             data: {
               full_name: fullName,
-              role: role
+              role: safeRole
             }
           }
         });
-        
+
         if (error) throw error;
-        
+
         if (data.user) {
           const { error: profileErr } = await supabase
             .from('profiles')
-            .update({ password: password, language: 'en' })
+            .update({ password: password, language: 'en', role: safeRole })
             .eq('id', data.user.id);
-          
+
           if (profileErr) {
              await supabase.from('profiles').insert({
                id: data.user.id,
                email: email.toLowerCase(),
                full_name: fullName,
-               role: role,
+               role: safeRole,
                password: password,
                language: 'en',
                avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${fullName}`
