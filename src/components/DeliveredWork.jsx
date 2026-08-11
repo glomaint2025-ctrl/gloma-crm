@@ -36,10 +36,13 @@ export default function DeliveredWork({
 
   const userRole = currentUserProfile?.role || 'Employee';
   const isAdminOrDev = userRole === 'Developer' || userRole === 'Admin';
+  // Admin, Developer and Manager can see every teammate's completion history;
+  // everyone else only sees their own.
+  const canSeeAllHistory = isAdminOrDev || userRole === 'Manager';
 
   // Get tasks that are complete or marked delivered by matching current user
   const myCompletedTasks = tasks.filter(t => {
-    if (isAdminOrDev) return true;
+    if (canSeeAllHistory) return true;
     return t.employee_id === currentUserProfile.id || t.employee_name === currentUserProfile.full_name;
   });
 
@@ -110,11 +113,14 @@ export default function DeliveredWork({
 
   // Filter Delivery
   const filteredDeliveries = deliveries.filter(del => {
-    const matchesSearch = 
+    const matchesSearch =
       del.deliverable_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       del.client_project.toLowerCase().includes(searchQuery.toLowerCase()) ||
       del.employee_name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    const matchesOwnership = canSeeAllHistory ||
+      del.employee_id === currentUserProfile.id ||
+      del.employee_name === currentUserProfile.full_name;
+    return matchesSearch && matchesOwnership;
   });
 
   return (
