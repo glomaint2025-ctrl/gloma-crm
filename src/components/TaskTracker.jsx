@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { sendTaskAssignedEmail } from '../emailService';
 import { 
   Search, 
   Filter, 
@@ -312,6 +313,7 @@ export default function TaskTracker({
     setIsModalOpen(false);
 
     // Automation: if task is assigned/updated to a teammate, issue notification log in supabase
+    // and send them an email via EmailJS.
     if (selectedEmpId && (!editingTask || editingTask.employee_id !== selectedEmpId)) {
       try {
         await supabase.from('notifications').insert({
@@ -322,6 +324,18 @@ export default function TaskTracker({
       } catch (err) {
         console.error("Notification logging failed:", err);
       }
+
+      sendTaskAssignedEmail({
+        toEmail: foundProfile?.email,
+        toName: selectedEmpName,
+        taskId: taskIdField,
+        taskTitle: taskDetail,
+        clientName: resolvedClientName,
+        workType,
+        priority: taskPriority,
+        dueDate,
+        assignedBy: currentUserProfile?.full_name
+      });
     }
   };
 

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Filter, Calendar as CalIcon, Plus } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { sendTaskAssignedEmail } from '../emailService';
 
 const localTranslations = {
   en: {
@@ -128,7 +130,7 @@ export default function ContentCalendar({
     setIsModalOpen(true);
   };
 
-  const handleQuickSave = (e) => {
+  const handleQuickSave = async (e) => {
     e.preventDefault();
     if (!clientProject.trim() || !taskDetail.trim()) {
       alert("Client & Task Detail are required.");
@@ -170,6 +172,31 @@ export default function ContentCalendar({
 
     onSaveTask(newTask);
     setIsModalOpen(false);
+
+    // Same assignment notification + email as the Task Board's "New Task" flow.
+    if (selectedEmpId) {
+      try {
+        await supabase.from('notifications').insert({
+          user_id: selectedEmpId,
+          message: `New task assigned to you [${taskId}]: ${taskDetail} (${workType})`,
+          read: false
+        });
+      } catch (err) {
+        console.error('Notification logging failed:', err);
+      }
+
+      sendTaskAssignedEmail({
+        toEmail: foundProfile?.email,
+        toName: selectedEmpName,
+        taskId,
+        taskTitle: taskDetail,
+        clientName: newTask.client_project,
+        workType,
+        priority,
+        dueDate: selectedCalendarDate,
+        assignedBy: currentUserProfile?.full_name
+      });
+    }
   };
 
   const monthNames = [

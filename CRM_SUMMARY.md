@@ -22,6 +22,7 @@ The Gloma CRM is a modern, responsive web portal:
 * `src/components/ManageRoles.jsx` — **NEW (this session)**: standalone role-assignment + "Add New Team Member Account" panel, own sidebar tab, Admin/Developer only.
 * `src/components/SetupSettings.jsx` — now scoped to My Account Profile, G-Drive Workspace, Excel Tracker Import, and Developer Preferences only (Team/Roles tabs were extracted out — see Section 3).
 * `src/supabaseClient.js` — Supabase client + offline simulator.
+* `src/emailService.js` — **NEW**: EmailJS wrapper, sends the task-assignment email (see `EMAILJS_SETUP.md`).
 * `public/logo.png` — brand logo (128×128 PNG), used in main sidebar and Settings sidebar.
 * `public/favicon.svg` — favicon (real SVG embedding the Gloma gem mark, transparent background).
 * `supabase_fix_profiles.sql` — **NEW (this session)**: adds missing `profiles`/`system_settings` columns.
@@ -137,6 +138,18 @@ User clarification (Sinhala): "Developer" should mean the single full-control ow
 * **Verified** in local mock mode: seeded a fake mis-assigned `Developer` account, confirmed (a) it's invisible to Admin's Manage Roles view, (b) the real Developer can see it and demote it to a normal role via the dropdown, (c) `'Developer'` never appears as a choosable option for any other account in either the add-member or role-change dropdowns.
 * **Status**: ✅ Code done, committed, pushed. ⚠️ **`supabase_lock_developer_role.sql` not yet run** — required to actually demote Tharushka's live account and install the DB-level trigger; see Next steps.
 
+### Problem 10 — Email notification when a task is assigned, via EmailJS
+
+User request: when a task is assigned to someone, send them an email, and keep showing the notification on the Dashboard too (that part already existed).
+
+* **Dashboard notifications already worked** before this — `Dashboard.jsx` already fetched/displayed unread rows from the `notifications` table (dismiss button included). No change needed there.
+* **New**: [`src/emailService.js`](src/emailService.js) — thin wrapper around `@emailjs/browser` (`npm install @emailjs/browser`). `sendTaskAssignedEmail({...})` reads `VITE_EMAILJS_SERVICE_ID` / `VITE_EMAILJS_TEMPLATE_ID` / `VITE_EMAILJS_PUBLIC_KEY` from `.env`; if any are missing it just `console.warn`s and returns — task saving never breaks because of this.
+* Wired into the two places a task gets assigned to someone: [`TaskTracker.jsx`](src/components/TaskTracker.jsx)'s `handleSave` (Task Board "New Task"/edit) and [`ContentCalendar.jsx`](src/components/ContentCalendar.jsx)'s `handleQuickSave` (calendar day quick-add) — both right next to the existing `notifications` table insert. The Content Calendar path didn't even create a dashboard notification before; it does now too, for consistency.
+* **`.env.example`** added (had to add `!.env.example` to `.gitignore` — the existing `.env.*` rule was silently ignoring it too) listing all 5 env vars the app uses (2 Supabase + 3 EmailJS).
+* **`EMAILJS_SETUP.md`** added — full step-by-step for the user: create an EmailJS account, connect an email service, create the template (exact subject/body text to paste, including the easy-to-miss "To Email" = `{{to_email}}` setting), get the Public Key, then either paste the 3 values here or add them to `.env` + Vercel's Environment Variables directly.
+* **Verified**: confirmed via the local dev server that `isEmailConfigured` is correctly `false` with no keys set, and that calling `sendTaskAssignedEmail()` in that state logs a clear warning and resolves without throwing (task creation still succeeds).
+* **Status**: ✅ Code done, committed, pushed. ⚠️ **Not yet live** — waiting on the user to complete `EMAILJS_SETUP.md` and provide/set the 3 EmailJS keys (locally in `.env` for dev, and in Vercel's Environment Variables + a redeploy for production).
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
@@ -154,13 +167,14 @@ Cloud-session git operations on the mounted folder repeatedly leave `.git/*.lock
 
 ## 5. Next steps / open items
 
-1. **Run `supabase_lock_developer_role.sql` in the Supabase SQL Editor** — demotes Tharushka's (and any other) wrongly-assigned `Developer` account back to `Employee` and installs the DB trigger that blocks it from happening again. **After running it, go to Manage Roles and re-assign Tharushka's actual intended role** (they'll show as `Employee` until then).
-2. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
-3. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
-4. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
-5. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
-6. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
-7. Optional: consider whether the five `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
+1. **Finish EmailJS setup** — follow `EMAILJS_SETUP.md`, then give the 3 keys (or set them in Vercel's Environment Variables + redeploy) so task-assignment emails actually start sending. Everything else (dashboard notifications) already works without this.
+2. **Run `supabase_lock_developer_role.sql` in the Supabase SQL Editor** — demotes Tharushka's (and any other) wrongly-assigned `Developer` account back to `Employee` and installs the DB trigger that blocks it from happening again. **After running it, go to Manage Roles and re-assign Tharushka's actual intended role** (they'll show as `Employee` until then).
+3. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
+4. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
+5. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
+6. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
+7. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
+8. Optional: consider whether the five `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
 
 ## 6. Template prompt for a new AI chat
 
