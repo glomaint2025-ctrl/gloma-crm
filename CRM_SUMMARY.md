@@ -208,6 +208,28 @@ Calendar, and flag it separately if someone worked on a holiday.
 * **Status**: ✅ Code done, committed, pushed. ⚠️ **`supabase_add_time_logs.sql` not yet run** — required
   before the live site can store clock-in/out data.
 
+### Problem 12 — Dropdown text invisible (white-on-white), and holiday calendar moved out of Content Calendar
+
+User feedback: dropdown option lists render as an unreadable white-on-white UI bug across every tab; and
+the holiday overlay should not be mixed into Content Calendar — it should be its own separate calendar.
+
+* **Dropdown fix (`src/index.css`)**: the dark (default) theme never explicitly styled `<option>` —
+  only `body.light-theme select, option {...}` did. The base rule `button, input, select, textarea {
+  color: inherit }` made the closed `<select>` box look fine, but native browsers often render the
+  *opened* options popup with a white background regardless of page CSS, while `color: inherit` still
+  cascaded light/white text into it → invisible white-on-white text in every dropdown, every tab. Fixed
+  with a global `select { color-scheme: dark }` + explicit `option { background: var(--bg-panel); color:
+  var(--color-text-primary) }`, and `color-scheme: light` added to the existing light-theme override so
+  both themes stay correct. Verified computed styles on every tab with a dropdown (Task Board, Content
+  Calendar, EOD Updates, Work Hours, Manage Roles, Settings) in both themes.
+* **Holiday calendar moved (Problem 11 follow-up)**: reverted `ContentCalendar.jsx` back to only showing
+  tasks (no holiday tags, no `timeLogs` prop) — Content Calendar is task/content scheduling only, not
+  attendance. The Sri Lanka holiday calendar (Sundays + Poya/mercantile highlighting, "Worked: <names>"
+  tag) now lives as a dedicated **History / Holiday Calendar** toggle inside the **Work Hours** page
+  (`WorkHours.jsx`) instead — a real standalone month-grid view with its own prev/next navigation, kept
+  separate from the task calendar as requested. `src/workHours.js` logic is unchanged.
+* **Status**: ✅ Done, committed, pushed. No SQL/dashboard action needed for this one.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.

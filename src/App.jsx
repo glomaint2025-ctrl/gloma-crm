@@ -799,7 +799,6 @@ export default function App() {
             tasks={tasks}
             clients={clients}
             profiles={profiles}
-            timeLogs={timeLogs}
             currentUserProfile={currentUserProfile}
             lang={lang}
             onSaveTask={handleSaveTask}

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Filter, Calendar as CalIcon, Plus } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { sendTaskAssignedEmail } from '../emailService';
-import { getHoliday } from '../workHours';
 
 const localTranslations = {
   en: {
@@ -59,7 +58,6 @@ export default function ContentCalendar({
   tasks = [],
   clients = [],
   profiles = [],
-  timeLogs = [],
   currentUserProfile = {},
   lang = 'en',
   onSaveTask
@@ -214,45 +212,28 @@ export default function ContentCalendar({
     calendarCells.push(<div key={`empty-${i}`} className="calendar-day empty-day" style={styles.emptyDay}></div>);
   }
   // Month days
-  const pad2 = (n) => String(n).padStart(2, '0');
   for (let day = 1; day <= daysInMonth; day++) {
     const dayTasks = getTasksForDay(day);
     const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
-    const dateStr = `${year}-${pad2(month + 1)}-${pad2(day)}`;
-    const holiday = getHoliday(dateStr);
-    const workedOnHoliday = holiday
-      ? timeLogs.filter(l => l.work_date === dateStr && l.is_holiday)
-      : [];
 
     calendarCells.push(
       <div
         key={`day-${day}`}
         style={{
           ...styles.dayCell,
-          border: isToday ? '1px solid var(--color-gold)' : holiday ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-subtle)',
-          backgroundColor: isToday ? 'rgba(212,175,55,0.05)' : holiday ? 'rgba(239, 68, 68, 0.05)' : 'rgba(17,24,39,0.3)'
+          border: isToday ? '1px solid var(--color-gold)' : '1px solid var(--border-subtle)',
+          backgroundColor: isToday ? 'rgba(212,175,55,0.05)' : 'rgba(17,24,39,0.3)'
         }}
         onClick={() => handleDayClick(day)}
         className="calendar-day"
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
-          {holiday && (
-            <span style={styles.holidayTag} title={holiday.name}>{holiday.name}</span>
-          )}
-          <span style={{
-            ...styles.dayNumber,
-            marginLeft: 'auto',
-            color: isToday ? 'var(--color-gold)' : holiday ? '#EF4444' : 'var(--color-text-primary)',
-            fontWeight: isToday || holiday ? 'bold' : 'normal'
-          }}>
-            {day}
-          </span>
-        </div>
-        {workedOnHoliday.length > 0 && (
-          <span style={styles.workedHolidayTag}>
-            Worked: {workedOnHoliday.map(l => l.employee_name).join(', ')}
-          </span>
-        )}
+        <span style={{
+          ...styles.dayNumber,
+          color: isToday ? 'var(--color-gold)' : 'var(--color-text-primary)',
+          fontWeight: isToday ? 'bold' : 'normal'
+        }}>
+          {day}
+        </span>
         <div style={styles.dayTasksContainer}>
           {dayTasks.map(task => (
             <div 
@@ -557,31 +538,6 @@ const styles = {
   dayNumber: {
     fontSize: 'var(--font-size-xs)',
     alignSelf: 'flex-end'
-  },
-  holidayTag: {
-    fontSize: '8.5px',
-    fontWeight: '700',
-    color: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    border: '1px solid rgba(239, 68, 68, 0.25)',
-    borderRadius: '3px',
-    padding: '1px 4px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '100%'
-  },
-  workedHolidayTag: {
-    fontSize: '8.5px',
-    fontWeight: '700',
-    color: '#F59E0B',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    border: '1px dashed rgba(245, 158, 11, 0.35)',
-    borderRadius: '3px',
-    padding: '1px 4px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
   },
   dayTasksContainer: {
     display: 'flex',

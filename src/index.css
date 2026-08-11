@@ -98,6 +98,19 @@ button, input, select, textarea {
   color: inherit;
 }
 
+/* Native <select> dropdown popups don't inherit the page's dark theme in every
+   browser -- color: inherit above only styles the closed box. Without this, the
+   opened options list can render light/white text on a light/white native popup
+   background (invisible). Force explicit, always-readable colors on every tab. */
+select {
+  color-scheme: dark;
+}
+
+option {
+  background: var(--bg-panel);
+  color: var(--color-text-primary);
+}
+
 .glass-panel {
   background: var(--bg-glass);
   backdrop-filter: blur(12px);
@@ -456,6 +469,7 @@ body.light-theme .glass-panel {
 
 body.light-theme select,
 body.light-theme option {
+  color-scheme: light;
   background: #FFFFFF;
   color: #1F2937;
 }
