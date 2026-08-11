@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { 
-  Trophy, 
-  Clock, 
-  Hourglass, 
-  CheckCircle2, 
-  AlertTriangle, 
-  TrendingUp, 
-  User, 
-  PieChart, 
-  NotebookPen, 
-  Bell, 
-  CheckSquare, 
-  BookOpen, 
-  Timer
+import {
+  Trophy,
+  Clock,
+  Hourglass,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+  User,
+  PieChart,
+  NotebookPen,
+  Bell,
+  CheckSquare,
+  BookOpen,
+  Timer,
+  Play,
+  Square,
+  Users as UsersIcon
 } from 'lucide-react';
+import { getClosingTime, getHoliday, isHoliday, formatMinutes } from '../workHours';
 
 const localTranslations = {
   en: {
@@ -91,23 +95,50 @@ const localTranslations = {
   }
 };
 
-export default function Dashboard({ 
-  tasks = [], 
-  profiles = [], 
-  currentUserProfile = {}, 
-  lang = 'en' 
+export default function Dashboard({
+  tasks = [],
+  profiles = [],
+  currentUserProfile = {},
+  timeLogs = [],
+  onClockIn,
+  onClockOut,
+  lang = 'en'
 }) {
   const t = localTranslations[lang] || localTranslations.en;
   
   const userRole = currentUserProfile?.role || 'Employee';
   const isAdminOrDev = userRole === 'Developer' || userRole === 'Admin';
-  
+  // Admin, Developer, and Manager can see everyone's clock-in status/history.
+  const canSeeTeamWorkHours = isAdminOrDev || userRole === 'Manager';
+
   // Real-time Clock Clock
   const [time, setTime] = useState(new Date());
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // ===== Time clock (Start/Stop work) =====
+  const myActiveLog = timeLogs.find(l => l.user_id === currentUserProfile.id && !l.clock_out);
+  const activeSessions = timeLogs.filter(l => !l.clock_out);
+  const todayHoliday = getHoliday(new Date().toISOString().split('T')[0]);
+
+  // Is a still-running session currently past the day's closing time (or on a holiday)?
+  const isSessionOvertimeNow = (log, nowMs) => {
+    if (isHoliday(log.work_date)) return true;
+    const closing = getClosingTime(log.work_date);
+    if (!closing) return true; // Sunday
+    const [ch, cm] = closing.split(':').map(Number);
+    const clockIn = new Date(log.clock_in);
+    const closingDate = new Date(clockIn);
+    closingDate.setHours(ch, cm, 0, 0);
+    return nowMs > closingDate.getTime();
+  };
+
+  const myElapsedMinutes = myActiveLog
+    ? Math.max(0, Math.floor((time.getTime() - new Date(myActiveLog.clock_in).getTime()) / 60000))
+    : 0;
+  const myIsOvertimeNow = myActiveLog ? isSessionOvertimeNow(myActiveLog, time.getTime()) : false;
 
   // Notifications State
   const [myNotifications, setMyNotifications] = useState([]);
@@ -258,6 +289,45 @@ export default function Dashboard({
         </div>
       </div>
 
+      {/* Personal Time Clock */}
+      <div className="glass-panel" style={{
+        ...styles.timeClockWidget,
+        borderColor: myIsOvertimeNow ? 'rgba(239, 68, 68, 0.35)' : 'var(--border-glass)'
+      }}>
+        <div style={styles.timeClockLeft}>
+          <div style={{
+            ...styles.timeClockStatusDot,
+            backgroundColor: myActiveLog ? (myIsOvertimeNow ? '#EF4444' : '#10B981') : 'var(--color-text-muted)',
+            boxShadow: myActiveLog ? `0 0 8px ${myIsOvertimeNow ? '#EF4444' : '#10B981'}` : 'none'
+          }} />
+          <div>
+            <div style={styles.timeClockLabel}>
+              {myActiveLog
+                ? (myIsOvertimeNow ? 'Working — OVERTIME' : 'Working since ' + new Date(myActiveLog.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+                : 'Not clocked in'}
+            </div>
+            {myActiveLog && (
+              <div style={{ ...styles.timeClockElapsed, color: myIsOvertimeNow ? '#EF4444' : 'var(--color-gold)' }}>
+                {formatMinutes(myElapsedMinutes)} elapsed today
+              </div>
+            )}
+            {!myActiveLog && todayHoliday && (
+              <div style={styles.timeClockHolidayNote}>
+                Today is a holiday ({todayHoliday.name}) — hours worked will count as overtime.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <button
+          onClick={() => (myActiveLog ? onClockOut && onClockOut(myActiveLog.id) : onClockIn && onClockIn())}
+          className={myActiveLog ? 'btn-secondary' : 'btn-primary'}
+          style={styles.timeClockBtn}
+        >
+          {myActiveLog ? <><Square size={15} /> Stop Work</> : <><Play size={15} /> Start Work</>}
+        </button>
+      </div>
+
       {/* Main KPI Stats Bar */}
       <div style={styles.statsGrid}>
         <div className="glass-panel" style={styles.statCard}>
@@ -379,6 +449,44 @@ export default function Dashboard({
 
           {/* Right column: statuses and danger ticker */}
           <div style={styles.sideColumn}>
+            {canSeeTeamWorkHours && (
+              <div className="glass-panel" style={styles.gridSection}>
+                <div style={styles.sectionHeader}>
+                  <UsersIcon size={18} color="var(--color-gold)" />
+                  <h3 style={styles.sectionTitle}>Currently Working</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {activeSessions.map(log => {
+                    const elapsedMins = Math.max(0, Math.floor((time.getTime() - new Date(log.clock_in).getTime()) / 60000));
+                    const ot = isSessionOvertimeNow(log, time.getTime());
+                    return (
+                      <div
+                        key={log.id}
+                        style={{
+                          ...styles.workingNowRow,
+                          borderLeft: `3px solid ${ot ? '#EF4444' : '#10B981'}`
+                        }}
+                      >
+                        <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{log.employee_name}</span>
+                        <span style={{
+                          fontSize: 'var(--font-size-xs)',
+                          fontWeight: 700,
+                          color: ot ? '#EF4444' : 'var(--color-text-secondary)'
+                        }}>
+                          {ot ? 'OVERTIME' : formatMinutes(elapsedMins)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {activeSessions.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', padding: '12px' }}>
+                      No one is currently clocked in.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="glass-panel" style={styles.gridSection}>
               <div style={styles.sectionHeader}>
                 <PieChart size={18} color="var(--color-gold)" />
@@ -519,6 +627,44 @@ export default function Dashboard({
 
           {/* Right panel: alerts and notifications */}
           <div style={styles.sideColumn}>
+            {canSeeTeamWorkHours && (
+              <div className="glass-panel" style={styles.gridSection}>
+                <div style={styles.sectionHeader}>
+                  <UsersIcon size={18} color="var(--color-gold)" />
+                  <h3 style={styles.sectionTitle}>Currently Working</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {activeSessions.map(log => {
+                    const elapsedMins = Math.max(0, Math.floor((time.getTime() - new Date(log.clock_in).getTime()) / 60000));
+                    const ot = isSessionOvertimeNow(log, time.getTime());
+                    return (
+                      <div
+                        key={log.id}
+                        style={{
+                          ...styles.workingNowRow,
+                          borderLeft: `3px solid ${ot ? '#EF4444' : '#10B981'}`
+                        }}
+                      >
+                        <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{log.employee_name}</span>
+                        <span style={{
+                          fontSize: 'var(--font-size-xs)',
+                          fontWeight: 700,
+                          color: ot ? '#EF4444' : 'var(--color-text-secondary)'
+                        }}>
+                          {ot ? 'OVERTIME' : formatMinutes(elapsedMins)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {activeSessions.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', padding: '12px' }}>
+                      No one is currently clocked in.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             
             <div className="glass-panel" style={styles.gridSection}>
               <div style={styles.sectionHeader}>
@@ -591,6 +737,54 @@ const styles = {
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: '12px'
+  },
+  timeClockWidget: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '14px',
+    padding: '16px 20px'
+  },
+  timeClockLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px'
+  },
+  timeClockStatusDot: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    flexShrink: 0
+  },
+  timeClockLabel: {
+    fontSize: 'var(--font-size-md)',
+    fontWeight: '700',
+    color: 'var(--color-text-primary)'
+  },
+  timeClockElapsed: {
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: '600',
+    marginTop: '2px'
+  },
+  timeClockHolidayNote: {
+    fontSize: 'var(--font-size-xs)',
+    color: '#F59E0B',
+    marginTop: '2px'
+  },
+  timeClockBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  workingNowRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 12px',
+    backgroundColor: 'var(--bg-badge-dark)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-sm)'
   },
   title: {
     fontSize: 'var(--font-size-2xl)',

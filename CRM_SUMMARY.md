@@ -23,6 +23,8 @@ The Gloma CRM is a modern, responsive web portal:
 * `src/components/SetupSettings.jsx` — now scoped to My Account Profile, G-Drive Workspace, Excel Tracker Import, and Developer Preferences only (Team/Roles tabs were extracted out — see Section 3).
 * `src/supabaseClient.js` — Supabase client + offline simulator.
 * `src/emailService.js` — **NEW**: EmailJS wrapper, sends the task-assignment email (see `EMAILJS_SETUP.md`).
+* `src/workHours.js` — **NEW**: office hours / Sri Lanka holiday list / overtime-split logic, shared by Dashboard, `WorkHours.jsx`, and `ContentCalendar.jsx`.
+* `src/components/WorkHours.jsx` — **NEW**: work-hours history page (own records, or everyone's for Developer/Admin/Manager).
 * `public/logo.png` — brand logo (128×128 PNG), used in main sidebar and Settings sidebar.
 * `public/favicon.svg` — favicon (real SVG embedding the Gloma gem mark, transparent background).
 * `supabase_fix_profiles.sql` — **NEW (this session)**: adds missing `profiles`/`system_settings` columns.
@@ -150,6 +152,62 @@ User request: when a task is assigned to someone, send them an email, and keep s
 * **Verified**: confirmed via the local dev server that `isEmailConfigured` is correctly `false` with no keys set, and that calling `sendTaskAssignedEmail()` in that state logs a clear warning and resolves without throwing (task creation still succeeds).
 * **Status**: ✅ Code done, committed, pushed. ⚠️ **Not yet live** — waiting on the user to complete `EMAILJS_SETUP.md` and provide/set the 3 EmailJS keys (locally in `.env` for dev, and in Vercel's Environment Variables + a redeploy for production).
 
+### Problem 11 — Employee time clock (Start/Stop), overtime, and a Sri Lanka holiday calendar
+
+User request (Sinhala): office hours are Mon-Fri 8:30am-5:00pm, Saturday 8:30am-3:30pm. Every employee
+should have a Start/Stop button on the Dashboard; time worked past closing counts separately as
+overtime; this should show highlighted on Admin/Manager/Developer dashboards per employee; each
+employee should be able to see their own work-hours history, and Admin should see everyone's. Sundays,
+Poya days, and mercantile holidays are company holidays — add a Sri Lanka holiday calendar to Content
+Calendar, and flag it separately if someone worked on a holiday.
+
+* **New `src/workHours.js`** — single source of truth for office-hours/holiday logic, imported by
+  Dashboard, WorkHours, and ContentCalendar so all three agree:
+  - `SRI_LANKA_HOLIDAYS_2026`: a **best-effort** list of 2026 Poya days + public/mercantile holidays,
+    compiled from published 2026 calendar sources (see chat for sources). Five of these are
+    moon-sighting-dependent (Islamic feasts, Sinhala/Tamil New Year) and can shift by a day — **verify
+    against the official government gazette before relying on this for real payroll**, and update this
+    array for 2027+ each year.
+  - `getHoliday(dateStr)` / `isHoliday(dateStr)`: Sunday is always a holiday; otherwise looks up the list.
+  - `getClosingTime(dateStr)`: `17:00` weekdays, `15:30` Saturday, `null` on Sunday.
+  - `splitWorkedMinutes(clockInISO, clockOutISO, workDate)`: splits a session into
+    `{ regularMinutes, overtimeMinutes }` — entire session counts as overtime on a holiday/Sunday,
+    otherwise split at the day's closing time. **Verified with 5 unit-tested cases** (weekday crossing
+    5pm, Saturday crossing 3:30pm, full Sunday, full gazetted holiday, normal in-hours session) — all
+    matched expected splits exactly.
+* **New `supabase_add_time_logs.sql`** — creates `public.time_logs` (`user_id`, `employee_name`,
+  `work_date`, `clock_in`, `clock_out`, `regular_minutes`, `overtime_minutes`, `is_holiday`) with RLS:
+  everyone can insert/update only their own rows (self clock-in/out only); SELECT is open to the row's
+  owner plus Admin/Developer/Manager (same visibility tier as Final Deliveries, Problem 9's pattern).
+* **`src/App.jsx`**: new `timeLogs` state fetched in `refreshData()`; `handleClockIn` (blocks a second
+  concurrent clock-in for the same user) and `handleClockOut` (computes the regular/overtime split via
+  `splitWorkedMinutes` and stores it, plus `is_holiday`) — both plain Supabase insert/update, work
+  unmodified in mock mode since the mock client's CRUD is fully generic. New sidebar nav item **Work
+  Hours** (Clock icon), visible to everyone, routes to the new `WorkHours` component.
+* **`src/components/Dashboard.jsx`**: a Start/Stop widget under the header, visible to **every** role —
+  shows live elapsed time, switches to a red "OVERTIME" state the instant the ticking clock crosses the
+  day's closing time (reuses the dashboard's existing 1s clock timer, no new interval), and warns
+  up-front if today is a holiday. A **"Currently Working"** panel (Developer/Admin/Manager only,
+  `canSeeTeamWorkHours` flag — added to both the admin-layout and employee-layout side columns since
+  Manager currently renders the employee-style dashboard layout) lists everyone's active sessions with
+  the same live overtime highlight.
+* **New `src/components/WorkHours.jsx`** — history table: `Date | [Employee] | Clock In | Clock Out |
+  Regular | Overtime`, plus a holiday badge per row and month-to-date regular/overtime totals. Employee
+  column and the employee filter dropdown only render for Developer/Admin/Manager; everyone else only
+  ever sees their own rows (filtered client-side, same pattern as Final Deliveries).
+* **`src/components/ContentCalendar.jsx`**: day cells for a Sunday/holiday get a red-tinted border +
+  the holiday name tag; if any `time_logs` row has `is_holiday: true` for that date, an additional
+  amber "Worked: <names>" tag appears on the same cell.
+* **Verified end-to-end** in local mock mode: clocked in/out as an Editor and confirmed the widget,
+  history page (own-only), and a real saved `time_logs` row; seeded a second employee's active session
+  and confirmed the Developer dashboard's "Currently Working" panel + OVERTIME highlight; confirmed the
+  Work Hours page shows the Employee column + filter + both employees' rows for Developer but only
+  the Editor's own row for the Editor; confirmed August 2026's calendar correctly highlights every
+  Sunday plus the two gazetted holidays that month, and that a seeded holiday work session renders the
+  "Worked: Devin Editor" tag on that day.
+* **Status**: ✅ Code done, committed, pushed. ⚠️ **`supabase_add_time_logs.sql` not yet run** — required
+  before the live site can store clock-in/out data.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
@@ -167,14 +225,16 @@ Cloud-session git operations on the mounted folder repeatedly leave `.git/*.lock
 
 ## 5. Next steps / open items
 
-1. **Finish EmailJS setup** — follow `EMAILJS_SETUP.md`, then give the 3 keys (or set them in Vercel's Environment Variables + redeploy) so task-assignment emails actually start sending. Everything else (dashboard notifications) already works without this.
-2. **Run `supabase_lock_developer_role.sql` in the Supabase SQL Editor** — demotes Tharushka's (and any other) wrongly-assigned `Developer` account back to `Employee` and installs the DB trigger that blocks it from happening again. **After running it, go to Manage Roles and re-assign Tharushka's actual intended role** (they'll show as `Employee` until then).
-3. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
-4. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
-5. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
-6. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
-7. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
-8. Optional: consider whether the five `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
+1. **Run `supabase_add_time_logs.sql` in the Supabase SQL Editor** — the time clock (Problem 11) is deployed in code but needs this table to store clock-in/out data on the live site.
+2. **Verify the 2026 Sri Lanka holiday list** (`SRI_LANKA_HOLIDAYS_2026` in `src/workHours.js`) against the official government gazette, especially the 5 moon-sighting-dependent dates — and remember to add a 2027 list before the year rolls over.
+3. **Finish EmailJS setup** — follow `EMAILJS_SETUP.md`, then give the 3 keys (or set them in Vercel's Environment Variables + redeploy) so task-assignment emails actually start sending. Everything else (dashboard notifications) already works without this.
+4. **Run `supabase_lock_developer_role.sql` in the Supabase SQL Editor** — demotes Tharushka's (and any other) wrongly-assigned `Developer` account back to `Employee` and installs the DB trigger that blocks it from happening again. **After running it, go to Manage Roles and re-assign Tharushka's actual intended role** (they'll show as `Employee` until then).
+5. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
+6. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
+7. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
+8. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
+9. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
+10. Optional: consider whether the six `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
 
 ## 6. Template prompt for a new AI chat
 

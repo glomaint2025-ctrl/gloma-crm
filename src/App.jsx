@@ -11,6 +11,8 @@ import DeliveredWork from './components/DeliveredWork';
 import TeamMembers from './components/TeamMembers';
 import ManageRoles from './components/ManageRoles';
 import SetupSettings from './components/SetupSettings';
+import WorkHours from './components/WorkHours';
+import { splitWorkedMinutes, isHoliday, todayStr } from './workHours';
 
 import {
   LayoutDashboard,
@@ -26,7 +28,8 @@ import {
   Shield,
   ShieldAlert,
   Menu,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 
 const sidebarTranslations = {
@@ -37,6 +40,7 @@ const sidebarTranslations = {
     calendar: "Content Calendar",
     updates: "EOD Updates",
     deliveries: "Final Deliveries",
+    workHours: "Work Hours",
     team: "Team Members",
     roles: "Manage Roles",
     settings: "System Settings",
@@ -50,6 +54,7 @@ const sidebarTranslations = {
     calendar: "දින දර්ශනය",
     updates: "EOD යාවත්කාලීන",
     deliveries: "භාරදීම්",
+    workHours: "වැඩ කරන වේලාවන්",
     team: "කණ්ඩායම් සාමාජිකයින්",
     roles: "අවසර කළමනාකරණය",
     settings: "පද්ධති සැකසුම්",
@@ -63,6 +68,7 @@ const sidebarTranslations = {
     calendar: "உள்ளடக்க காலெண்டர்",
     updates: "தினசரி புதுப்பிப்புகள்",
     deliveries: "இறுதி வழங்கல்கள்",
+    workHours: "பணி நேரங்கள்",
     team: "குழு உறுப்பினர்கள்",
     roles: "பாத்திர நிர்வாகம்",
     settings: "அமைப்புகள்",
@@ -96,6 +102,7 @@ export default function App() {
   const [tasks, setTasks] = useState([]);
   const [dailyUpdates, setDailyUpdates] = useState([]);
   const [deliveredWork, setDeliveredWork] = useState([]);
+  const [timeLogs, setTimeLogs] = useState([]);
   
   const [globalSettings, setGlobalSettings] = useState({
     language: 'en',
@@ -232,6 +239,11 @@ export default function App() {
       const { data: qDeliveries } = await supabase.from('delivered_work').select('*');
       const sortedDeliveries = (qDeliveries || []).sort((a,b) => b.delivery_date.localeCompare(a.delivery_date));
       setDeliveredWork(sortedDeliveries);
+
+      // 6. Fetch time clock logs
+      const { data: qTimeLogs } = await supabase.from('time_logs').select('*');
+      const sortedTimeLogs = (qTimeLogs || []).sort((a, b) => (b.clock_in || '').localeCompare(a.clock_in || ''));
+      setTimeLogs(sortedTimeLogs);
     } catch (err) {
       console.error('Error fetching tables data:', err);
     }
@@ -521,6 +533,48 @@ export default function App() {
     }
   };
 
+  const handleClockIn = async () => {
+    if (!currentUserProfile?.id) return;
+    const alreadyActive = timeLogs.some(l => l.user_id === currentUserProfile.id && !l.clock_out);
+    if (alreadyActive) return;
+
+    try {
+      await supabase.from('time_logs').insert({
+        user_id: currentUserProfile.id,
+        employee_name: currentUserProfile.full_name,
+        work_date: todayStr(),
+        clock_in: new Date().toISOString(),
+        clock_out: null
+      });
+      await refreshData();
+    } catch (err) {
+      console.error('Clock-in failed:', err);
+    }
+  };
+
+  const handleClockOut = async (logId) => {
+    const log = timeLogs.find(l => l.id === logId);
+    if (!log) return;
+
+    const clockOutISO = new Date().toISOString();
+    const { regularMinutes, overtimeMinutes } = splitWorkedMinutes(log.clock_in, clockOutISO, log.work_date);
+
+    try {
+      await supabase
+        .from('time_logs')
+        .update({
+          clock_out: clockOutISO,
+          regular_minutes: regularMinutes,
+          overtime_minutes: overtimeMinutes,
+          is_holiday: isHoliday(log.work_date)
+        })
+        .eq('id', logId);
+      await refreshData();
+    } catch (err) {
+      console.error('Clock-out failed:', err);
+    }
+  };
+
   const handleImportBulkData = async (bulkObj) => {
     try {
       if (bulkObj.tasks && bulkObj.tasks.length > 0) {
@@ -637,6 +691,13 @@ export default function App() {
             <FileCheck size={18} /> {sbT.deliveries}
           </button>
 
+          <button
+            onClick={() => navTo('workHours')}
+            className={`nav-btn ${activeView === 'workHours' ? 'active' : ''}`}
+          >
+            <Clock size={18} /> {sbT.workHours}
+          </button>
+
           {/* Team directory: visible to ALL team members */}
           <button
             onClick={() => navTo('team')}
@@ -700,10 +761,13 @@ export default function App() {
 
         {/* Routed views */}
         {activeView === 'dashboard' && (
-          <Dashboard 
-            tasks={tasks} 
-            profiles={profiles} 
+          <Dashboard
+            tasks={tasks}
+            profiles={profiles}
             currentUserProfile={currentUserProfile}
+            timeLogs={timeLogs}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
             lang={lang}
           />
         )}
@@ -735,6 +799,7 @@ export default function App() {
             tasks={tasks}
             clients={clients}
             profiles={profiles}
+            timeLogs={timeLogs}
             currentUserProfile={currentUserProfile}
             lang={lang}
             onSaveTask={handleSaveTask}
@@ -761,6 +826,15 @@ export default function App() {
             currentUserProfile={currentUserProfile}
             onSaveDelivery={handleSaveDelivery}
             onDeleteDelivery={handleDeleteDelivery}
+            lang={lang}
+          />
+        )}
+
+        {activeView === 'workHours' && (
+          <WorkHours
+            timeLogs={timeLogs}
+            profiles={profiles}
+            currentUserProfile={currentUserProfile}
             lang={lang}
           />
         )}
