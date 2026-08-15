@@ -12,6 +12,9 @@
 -- given: Aug 2 08:30 -> Aug 3 02:30 (overnight, lands on the Aug 2 Sunday so it's
 -- fully overtime), Aug 3 08:30-21:00, Aug 4 08:30-18:00.
 --
+-- Bishwa is targeted by exact email (bishwawijesekara19@gmail.com, SMM & Developer)
+-- since matching on the name "Bishwa" alone found 2 profiles.
+--
 -- PREREQUISITE: run supabase_add_time_logs.sql first (creates the time_logs table).
 -- SAFE TO RUN: ONCE ONLY. Running this twice will insert duplicate rows -- there's
 -- no de-duplication here since it's a one-time historical backfill, not a schema
@@ -27,21 +30,22 @@ declare
   bishwa_id uuid;
   bishwa_name text;
   devin_count int;
-  bishwa_count int;
 begin
   select count(*) into devin_count from public.profiles where full_name ilike '%devin%';
-  select count(*) into bishwa_count from public.profiles where full_name ilike '%bishwa%';
 
   if devin_count > 1 then
     raise exception 'More than one profile matches "Devin" (% found) -- edit this script to target the right person by id instead.', devin_count;
   end if;
-  if bishwa_count = 0 then
-    raise exception 'No profile found matching "Bishwa" -- check the name and retry.';
-  elsif bishwa_count > 1 then
-    raise exception 'More than one profile matches "Bishwa" (% found) -- edit this script to target the right person by id instead.', bishwa_count;
-  end if;
 
-  select id, full_name into bishwa_id, bishwa_name from public.profiles where full_name ilike '%bishwa%';
+  -- Bishwa confirmed as bishwawijesekara19@gmail.com (SMM & Developer) -- target
+  -- by exact email since "Bishwa" alone matched 2 profiles.
+  select id, full_name into bishwa_id, bishwa_name
+  from public.profiles
+  where lower(email) = 'bishwawijesekara19@gmail.com';
+
+  if bishwa_id is null then
+    raise exception 'No profile found with email bishwawijesekara19@gmail.com -- check the email and retry.';
+  end if;
 
   if devin_count = 1 then
     select id, full_name into devin_id, devin_name from public.profiles where full_name ilike '%devin%';
