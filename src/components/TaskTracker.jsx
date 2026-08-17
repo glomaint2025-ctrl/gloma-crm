@@ -50,7 +50,11 @@ const localTranslations = {
     saveBtn: "Save Assignment",
     cancelBtn: "Cancel",
     confirmDelete: "Are you sure you want to delete this task?",
-    emptyTasks: "No tasks found matching current filters."
+    emptyTasks: "No tasks found matching current filters.",
+    paymentLabel: "Client Payment Status",
+    paidBtn: "Paid",
+    notPaidBtn: "Not Paid",
+    amountLabel: "Amount (LKR)"
   },
   si: {
     searchPlaceholder: "කාර්ය කේතය, නම හෝ සේවාදායකයාගෙන් සොයන්න...",
@@ -83,7 +87,11 @@ const localTranslations = {
     saveBtn: "සුරකින්න",
     cancelBtn: "අවලංගු කරන්න",
     confirmDelete: "මෙම කාර්යය සම්පූර්ණයෙන්ම ඉවත් කිරීමට අවශ්‍යද?",
-    emptyTasks: "සොයන ලද පෙරහන් වලට ගැළපෙන කාර්යයන් කිසිවක් නැත."
+    emptyTasks: "සොයන ලද පෙරහන් වලට ගැළපෙන කාර්යයන් කිසිවක් නැත.",
+    paymentLabel: "සේවාදායක ගෙවීම් තත්වය",
+    paidBtn: "ගෙවා ඇත",
+    notPaidBtn: "ගෙවා නැත",
+    amountLabel: "මුදල (LKR)"
   },
   ta: {
     searchPlaceholder: "குறியீடு, பெயர் அல்லது வாடிக்கையாளர் மூலம் தேடுக...",
@@ -116,7 +124,11 @@ const localTranslations = {
     saveBtn: "சேமிக்க",
     cancelBtn: "ரத்து செய்",
     confirmDelete: "இந்தப் பணியை நீக்க விரும்புகிறீர்களா?",
-    emptyTasks: "வடிகட்டிகளுக்குப் பொருத்தமான பணிகள் எதுவும் காணப்படவில்லை."
+    emptyTasks: "வடிகட்டிகளுக்குப் பொருத்தமான பணிகள் எதுவும் காணப்படவில்லை.",
+    paymentLabel: "வாடிக்கையாளர் கட்டண நிலை",
+    paidBtn: "செலுத்தப்பட்டது",
+    notPaidBtn: "செலுத்தப்படவில்லை",
+    amountLabel: "தொகை (LKR)"
   }
 };
 
@@ -156,10 +168,14 @@ export default function TaskTracker({
   const [finalDeliveryLink, setFinalDeliveryLink] = useState('');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('Not Paid');
+  const [paymentAmount, setPaymentAmount] = useState('');
 
   const userRole = currentUserProfile?.role || 'Employee';
-  const hasAssignPrivilege = userRole === 'Developer' || userRole === 'Admin' || userRole === 'Manager';
+  const hasAssignPrivilege = userRole === 'Developer' || userRole === 'Admin' || userRole === 'Manager' || userRole === 'Coordinator & Accountant';
   const hasDeletePrivilege = userRole === 'Developer';
+  // Who can mark a website task Paid / Not Paid.
+  const canManagePayment = userRole === 'Developer' || userRole === 'Admin' || userRole === 'Manager' || userRole === 'Coordinator & Accountant';
 
   // Apply filters
   const filteredTasks = tasks.filter(task => {
@@ -238,6 +254,8 @@ export default function TaskTracker({
       setFinalDeliveryLink(task.final_delivery_link || '');
       setStartDate(task.start_date ? task.start_date.substring(0, 10) : '');
       setDueDate(task.due_date ? task.due_date.substring(0, 10) : '');
+      setPaymentStatus(task.payment_status || 'Not Paid');
+      setPaymentAmount(task.payment_amount != null ? String(task.payment_amount) : '');
     } else {
       if (!hasAssignPrivilege) {
         alert("Only Administrators or Developers can create new tasks.");
@@ -260,6 +278,8 @@ export default function TaskTracker({
       setFinalDeliveryLink('');
       setStartDate(new Date().toISOString().substring(0, 10));
       setDueDate(new Date(Date.now() + 86400000 * 3).toISOString().substring(0, 10));
+      setPaymentStatus('Not Paid');
+      setPaymentAmount('');
     }
     setIsModalOpen(true);
   };
@@ -306,6 +326,8 @@ export default function TaskTracker({
       final_delivery_link: finalDeliveryLink,
       start_date: startDate || new Date().toISOString().substring(0,10),
       due_date: dueDate,
+      payment_status: workType === 'Website' ? paymentStatus : null,
+      payment_amount: workType === 'Website' && paymentAmount !== '' ? parseFloat(paymentAmount) : null,
       last_updated: new Date().toISOString()
     };
 
@@ -527,7 +549,7 @@ export default function TaskTracker({
 
                       <div style={styles.cardClient}>{task.client_project}</div>
                       <div style={styles.cardTitle}>{task.title}</div>
-                      
+
                       <div style={styles.cardInfoRow}>
                         <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gold)', fontWeight: 'bold' }}>
                           {task.work_type}
@@ -536,6 +558,18 @@ export default function TaskTracker({
                           {task.employee_name || t.unassigned}
                         </span>
                       </div>
+
+                      {task.work_type === 'Website' && (
+                        <span style={{
+                          ...styles.paymentBadge,
+                          color: task.payment_status === 'Paid' ? '#10B981' : '#EF4444',
+                          backgroundColor: task.payment_status === 'Paid' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                          borderColor: task.payment_status === 'Paid' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'
+                        }}>
+                          {task.payment_status === 'Paid' ? t.paidBtn : t.notPaidBtn}
+                          {task.payment_amount ? ` · LKR ${Number(task.payment_amount).toLocaleString()}` : ''}
+                        </span>
+                      )}
 
                       {/* Dates visualization */}
                       <div style={styles.cardDates}>
@@ -584,6 +618,7 @@ export default function TaskTracker({
                   <th>Priority</th>
                   <th>Status</th>
                   <th>Progress</th>
+                  <th>Payment</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -621,6 +656,20 @@ export default function TaskTracker({
                       </span>
                     </td>
                     <td style={{ fontWeight: '600' }}>{Math.round((task.progress || 0) * 100)}%</td>
+                    <td>
+                      {task.work_type === 'Website' ? (
+                        <span style={{
+                          ...styles.paymentBadge,
+                          color: task.payment_status === 'Paid' ? '#10B981' : '#EF4444',
+                          backgroundColor: task.payment_status === 'Paid' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                          borderColor: task.payment_status === 'Paid' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'
+                        }}>
+                          {task.payment_status === 'Paid' ? t.paidBtn : t.notPaidBtn}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>—</span>
+                      )}
+                    </td>
                     <td>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => openTaskModal(task)} style={styles.gridActionBtn} title="Edit">
@@ -752,6 +801,58 @@ export default function TaskTracker({
                   )}
                 </div>
               </div>
+
+              {workType === 'Website' && (
+                <div style={{ ...styles.formRow, ...styles.paymentSection }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.modalLabel}>{t.paymentLabel}</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        disabled={!canManagePayment}
+                        onClick={() => setPaymentStatus('Paid')}
+                        style={{
+                          ...styles.paymentToggleBtn,
+                          backgroundColor: paymentStatus === 'Paid' ? 'rgba(16,185,129,0.18)' : 'transparent',
+                          borderColor: paymentStatus === 'Paid' ? '#10B981' : 'var(--border-subtle)',
+                          color: paymentStatus === 'Paid' ? '#10B981' : 'var(--color-text-secondary)',
+                          cursor: canManagePayment ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        {t.paidBtn}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canManagePayment}
+                        onClick={() => setPaymentStatus('Not Paid')}
+                        style={{
+                          ...styles.paymentToggleBtn,
+                          backgroundColor: paymentStatus === 'Not Paid' ? 'rgba(239,68,68,0.18)' : 'transparent',
+                          borderColor: paymentStatus === 'Not Paid' ? '#EF4444' : 'var(--border-subtle)',
+                          color: paymentStatus === 'Not Paid' ? '#EF4444' : 'var(--color-text-secondary)',
+                          cursor: canManagePayment ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        {t.notPaidBtn}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.modalLabel}>{t.amountLabel}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      readOnly={!canManagePayment}
+                      placeholder="e.g. 45000"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label style={styles.modalLabel}>{t.titleLabel}</label>
@@ -1057,6 +1158,14 @@ const styles = {
     paddingTop: '4px',
     borderTop: '1px dashed var(--border-subtle)'
   },
+  paymentBadge: {
+    fontSize: 'var(--font-size-xs)',
+    fontWeight: '700',
+    padding: '2px 8px',
+    borderRadius: 'var(--radius-full)',
+    border: '1px solid',
+    alignSelf: 'flex-start'
+  },
   cardDates: {
     display: 'flex',
     alignItems: 'center',
@@ -1171,6 +1280,21 @@ const styles = {
     display: 'flex',
     gap: '12px',
     flexWrap: 'wrap'
+  },
+  paymentSection: {
+    padding: '12px',
+    backgroundColor: 'rgba(212, 175, 55, 0.04)',
+    border: '1px dashed rgba(212, 175, 55, 0.25)',
+    borderRadius: 'var(--radius-sm)'
+  },
+  paymentToggleBtn: {
+    flex: 1,
+    padding: '8px 12px',
+    borderRadius: 'var(--radius-sm)',
+    border: '1px solid var(--border-subtle)',
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: '700',
+    transition: 'all var(--transition-fast)'
   },
   modalLabel: {
     display: 'block',

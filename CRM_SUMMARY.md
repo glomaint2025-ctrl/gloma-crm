@@ -230,6 +230,38 @@ the holiday overlay should not be mixed into Content Calendar — it should be i
   separate from the task calendar as requested. `src/workHours.js` logic is unchanged.
 * **Status**: ✅ Done, committed, pushed. No SQL/dashboard action needed for this one.
 
+### Problem 13 — Coordinator & Accountant role, client payment tracking, and a Company Finance tab
+
+User request: rename the "Accountant" role to "Coordinator & Accountant" and give it task-assignment
+access; add a Paid/Not Paid button (with amount) to Website-type tasks, settable by Admin/Manager/
+Coordinator & Accountant; add a dedicated Company Finance tab for the same three roles (+Developer).
+
+* **Role rename**: [`ManageRoles.jsx`](src/components/ManageRoles.jsx) — `allRolesList` now offers
+  `'Coordinator & Accountant'` instead of `'Accountant'`. The separate, pre-existing `'Coordinator'`
+  role is untouched. `supabase_rename_accountant_role.sql` updates any existing live `profiles` rows
+  still holding the old value.
+* **Task assignment**: [`TaskTracker.jsx`](src/components/TaskTracker.jsx) — `hasAssignPrivilege` now
+  includes `'Coordinator & Accountant'` alongside Developer/Admin/Manager.
+* **Payment tracking on Website tasks**: the task create/edit modal shows a Paid/Not Paid toggle +
+  LKR amount field whenever Work Type is `Website`, editable by Developer/Admin/Manager/Coordinator &
+  Accountant (read-only for everyone else). Saved as `payment_status` / `payment_amount` on the task.
+  A small colored badge (status + amount) now shows on the Website task's Kanban card and in a new
+  "Payment" column in the Task Board's list view. `supabase_add_payment_fields.sql` adds the two
+  columns to the live `tasks` table.
+* **New Company Finance tab**: [`Finance.jsx`](src/components/Finance.jsx) — nav item visible only to
+  Developer/Admin/Manager/Coordinator & Accountant. Shows Total Collected / Total Outstanding / paid
+  vs unpaid project counts, a client + payment-status filter, and a table of every Website task with an
+  inline Paid/Not Paid toggle and an inline-editable amount — this is the primary place the finance
+  role is expected to work from day to day, separate from having to open each task individually.
+* **Verified** in local mock mode: confirmed the role dropdown no longer offers "Accountant" (old
+  option gone, new one present); a Coordinator & Accountant test account could create tasks and saw
+  the Company Finance nav item; created a Website task, confirmed the payment section only appears for
+  Website work type, saved it with `payment_status: "Not Paid"` / `payment_amount: 75000`; confirmed the
+  badge appears on the board card; confirmed the Finance tab's totals matched (LKR 75,000 outstanding, 1
+  unpaid) and toggling Paid from the Finance table live-updated the totals to 0 outstanding / 1 paid;
+  confirmed a non-finance role (Editor) does not see the Company Finance nav item at all.
+* **Status**: ✅ Code done, committed, pushed. ⚠️ **Two SQL migrations not yet run** — see Next steps.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
@@ -247,16 +279,17 @@ Cloud-session git operations on the mounted folder repeatedly leave `.git/*.lock
 
 ## 5. Next steps / open items
 
-1. **Run `supabase_add_time_logs.sql` in the Supabase SQL Editor** — the time clock (Problem 11) is deployed in code but needs this table to store clock-in/out data on the live site.
-2. **Verify the 2026 Sri Lanka holiday list** (`SRI_LANKA_HOLIDAYS_2026` in `src/workHours.js`) against the official government gazette, especially the 5 moon-sighting-dependent dates — and remember to add a 2027 list before the year rolls over.
-3. **Finish EmailJS setup** — follow `EMAILJS_SETUP.md`, then give the 3 keys (or set them in Vercel's Environment Variables + redeploy) so task-assignment emails actually start sending. Everything else (dashboard notifications) already works without this.
-4. **Run `supabase_lock_developer_role.sql` in the Supabase SQL Editor** — demotes Tharushka's (and any other) wrongly-assigned `Developer` account back to `Employee` and installs the DB trigger that blocks it from happening again. **After running it, go to Manage Roles and re-assign Tharushka's actual intended role** (they'll show as `Employee` until then).
-5. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
-6. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
-7. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
-8. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
-9. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
-10. Optional: consider whether the six `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
+1. **Run `supabase_rename_accountant_role.sql` and `supabase_add_payment_fields.sql`** in the Supabase SQL Editor — Problem 13 (Coordinator & Accountant role + Website payment tracking + Company Finance tab) is deployed in code but needs these to work on the live site.
+2. **Run `supabase_add_time_logs.sql` in the Supabase SQL Editor** — the time clock (Problem 11) is deployed in code but needs this table to store clock-in/out data on the live site.
+4. **Verify the 2026 Sri Lanka holiday list** (`SRI_LANKA_HOLIDAYS_2026` in `src/workHours.js`) against the official government gazette, especially the 5 moon-sighting-dependent dates — and remember to add a 2027 list before the year rolls over.
+5. **Finish EmailJS setup** — follow `EMAILJS_SETUP.md`, then give the 3 keys (or set them in Vercel's Environment Variables + redeploy) so task-assignment emails actually start sending. Everything else (dashboard notifications) already works without this.
+6. **Run `supabase_lock_developer_role.sql` in the Supabase SQL Editor** — demotes Tharushka's (and any other) wrongly-assigned `Developer` account back to `Employee` and installs the DB trigger that blocks it from happening again. **After running it, go to Manage Roles and re-assign Tharushka's actual intended role** (they'll show as `Employee` until then).
+7. **Run `supabase_add_last_seen.sql` in the Supabase SQL Editor** — the Presence/online-status feature (Problem 8) is deployed in code but will error/no-op on the live site until the `profiles.last_seen` column exists.
+8. **Disable "Confirm email" in the Supabase dashboard** (Authentication → **Sign In / Providers** tab → click the Email row → toggle "Confirm email" off — **not** the "Emails → SMTP Settings" tab, that's for a different purpose) — see Problem 7. Blocking reliable team-member account creation; can only be done by someone with Supabase dashboard access, not from this repo.
+9. Revoke the GitHub PAT that's been pasted into this chat (`github.com/settings/tokens`) and generate a fresh one only when actually needed for the next push.
+10. Check whether any team members created just before the rate-limit error (e.g. Seneth) actually ended up able to log in, once "Confirm email" is off — recreate their account if not.
+11. Optional cleanup: delete `.git/_stale_locks/` in `D:\Gloma CRM` if present.
+12. Optional: consider whether the eight `supabase_*.sql` files should be moved into a `supabase/migrations/` folder for cleanliness now that there are several in the repo root (`supabase_setup.md` legacy doc name may also want reconciling).
 
 ## 6. Template prompt for a new AI chat
 

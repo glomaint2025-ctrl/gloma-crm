@@ -12,6 +12,7 @@ import TeamMembers from './components/TeamMembers';
 import ManageRoles from './components/ManageRoles';
 import SetupSettings from './components/SetupSettings';
 import WorkHours from './components/WorkHours';
+import Finance from './components/Finance';
 import { splitWorkedMinutes, isHoliday, todayStr } from './workHours';
 
 import {
@@ -29,7 +30,8 @@ import {
   ShieldAlert,
   Menu,
   X,
-  Clock
+  Clock,
+  Wallet
 } from 'lucide-react';
 
 const sidebarTranslations = {
@@ -41,6 +43,7 @@ const sidebarTranslations = {
     updates: "EOD Updates",
     deliveries: "Final Deliveries",
     workHours: "Work Hours",
+    finance: "Company Finance",
     team: "Team Members",
     roles: "Manage Roles",
     settings: "System Settings",
@@ -55,6 +58,7 @@ const sidebarTranslations = {
     updates: "EOD යාවත්කාලීන",
     deliveries: "භාරදීම්",
     workHours: "වැඩ කරන වේලාවන්",
+    finance: "සමාගමේ ගිණුම්කරණය",
     team: "කණ්ඩායම් සාමාජිකයින්",
     roles: "අවසර කළමනාකරණය",
     settings: "පද්ධති සැකසුම්",
@@ -69,6 +73,7 @@ const sidebarTranslations = {
     updates: "தினசரி புதுப்பிப்புகள்",
     deliveries: "இறுதி வழங்கல்கள்",
     workHours: "பணி நேரங்கள்",
+    finance: "நிறுவன நிதி",
     team: "குழு உறுப்பினர்கள்",
     roles: "பாத்திர நிர்வாகம்",
     settings: "அமைப்புகள்",
@@ -698,6 +703,16 @@ export default function App() {
             <Clock size={18} /> {sbT.workHours}
           </button>
 
+          {/* Company Finance: Admin/Manager/Coordinator & Accountant/Developer only */}
+          {['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(currentUserProfile?.role) && (
+            <button
+              onClick={() => navTo('finance')}
+              className={`nav-btn ${activeView === 'finance' ? 'active' : ''}`}
+            >
+              <Wallet size={18} /> {sbT.finance}
+            </button>
+          )}
+
           {/* Team directory: visible to ALL team members */}
           <button
             onClick={() => navTo('team')}
@@ -834,6 +849,16 @@ export default function App() {
             timeLogs={timeLogs}
             profiles={profiles}
             currentUserProfile={currentUserProfile}
+            lang={lang}
+          />
+        )}
+
+        {activeView === 'finance' && (
+          <Finance
+            tasks={tasks}
+            clients={clients}
+            currentUserProfile={currentUserProfile}
+            onSaveTask={handleSaveTask}
             lang={lang}
           />
         )}

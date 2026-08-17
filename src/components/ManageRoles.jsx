@@ -103,7 +103,7 @@ export default function ManageRoles({
     { value: 'Editor', label: 'Editor' },
     { value: 'Social Media Executive', label: 'Social Media Executive' },
     { value: 'SMM & Developer', label: 'SMM & Developer (Web Developer)' },
-    { value: 'Accountant', label: 'Accountant' },
+    { value: 'Coordinator & Accountant', label: 'Coordinator & Accountant' },
     { value: 'Coordinator', label: 'Coordinator' },
     { value: 'Marketing Executive', label: 'Marketing Executive' },
     { value: 'Manager', label: 'Manager' },
