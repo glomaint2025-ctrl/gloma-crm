@@ -170,10 +170,15 @@ export default function ContentCalendar({
       last_updated: new Date().toISOString()
     };
 
-    onSaveTask(newTask);
+    const result = await onSaveTask(newTask);
+    if (result && result.success === false) {
+      alert(`Failed to save task: ${result.error || 'Unknown error'}`);
+      return;
+    }
     setIsModalOpen(false);
 
     // Same assignment notification + email as the Task Board's "New Task" flow.
+    // Only after the task itself actually saved.
     if (selectedEmpId) {
       try {
         await supabase.from('notifications').insert({

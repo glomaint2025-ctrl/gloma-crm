@@ -331,11 +331,15 @@ export default function TaskTracker({
       last_updated: new Date().toISOString()
     };
 
-    onSaveTask(taskObj);
+    const result = await onSaveTask(taskObj);
+    if (result && result.success === false) {
+      alert(`Failed to save task: ${result.error || 'Unknown error'}`);
+      return;
+    }
     setIsModalOpen(false);
 
     // Automation: if task is assigned/updated to a teammate, issue notification log in supabase
-    // and send them an email via EmailJS.
+    // and send them an email via EmailJS. Only after the task itself actually saved.
     if (selectedEmpId && (!editingTask || editingTask.employee_id !== selectedEmpId)) {
       try {
         await supabase.from('notifications').insert({

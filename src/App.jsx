@@ -433,21 +433,26 @@ export default function App() {
   const handleSaveTask = async (taskObj) => {
     try {
       const existing = tasks.some(t => t.id === taskObj.id);
-      
+      let error;
+
       if (existing) {
-        await supabase
+        ({ error } = await supabase
           .from('tasks')
           .update(taskObj)
-          .eq('id', taskObj.id);
+          .eq('id', taskObj.id));
       } else {
-        await supabase
+        ({ error } = await supabase
           .from('tasks')
-          .insert(taskObj);
+          .insert(taskObj));
       }
-      
+
+      if (error) throw error;
+
       await refreshData();
+      return { success: true };
     } catch (err) {
       console.error('Error saving task:', err);
+      return { success: false, error: err.message };
     }
   };
 
