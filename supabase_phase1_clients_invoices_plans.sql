@@ -73,7 +73,7 @@ language sql stable security definer
 set search_path = public
 as $$
   select public.is_developer()
-    or coalesce(public.current_user_role(), '') in ('Admin', 'Manager', 'Coordinator & Accountant');
+    or coalesce(public.current_user_role(), '') in ('Admin', 'Manager', 'Coordinator & Accountant', 'Accountant');
 $$;
 
 -- ---- 3. invoices -----------------------------------------------------------

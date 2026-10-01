@@ -93,6 +93,12 @@ const sidebarTranslations = {
 // role (Web Developer) and is not affected by this restriction.
 const DEVELOPER_OWNER_EMAIL = 'capcutproforeveryone@gmail.com';
 
+// 'Accountant' is the legacy name of the 'Coordinator & Accountant' role. Treat any
+// profile still stored with the old value as the new role so access checks work.
+const normalizeProfileRole = (profile) => (
+  profile && profile.role === 'Accountant' ? { ...profile, role: 'Coordinator & Accountant' } : profile
+);
+
 const guardDeveloperRole = (role, email) => {
   if (role === 'Developer' && (email || '').toLowerCase() !== DEVELOPER_OWNER_EMAIL) {
     console.warn(`Blocked assigning 'Developer' role to ${email} — reserved for ${DEVELOPER_OWNER_EMAIL}.`);
@@ -282,7 +288,7 @@ export default function App() {
         .eq('id', userId);
         
       if (data && data.length > 0) {
-        setCurrentUserProfile(data[0]);
+        setCurrentUserProfile(normalizeProfileRole(data[0]));
       } else {
         const fallbackProfile = {
           id: userId,
@@ -316,7 +322,7 @@ export default function App() {
     try {
       // 1. Fetch profiles
       const { data: pData } = await supabase.from('profiles').select('*');
-      setProfiles(pData || []);
+      setProfiles((pData || []).map(normalizeProfileRole));
 
       // 2. Fetch clients
       const { data: cData } = await supabase.from('clients').select('*');
