@@ -14,6 +14,7 @@ import SetupSettings from './components/SetupSettings';
 import WorkHours from './components/WorkHours';
 import Finance from './components/Finance';
 import Invoices from './components/Invoices';
+import ClockReminder from './components/ClockReminder';
 import { splitWorkedMinutes, isHoliday, getClosingTime, todayStr, OFFICE_OPEN_TIME } from './workHours';
 
 import {
@@ -946,6 +947,12 @@ export default function App() {
             </span>
           </div>
         )}
+
+        <ClockReminder
+          currentUserProfile={currentUserProfile}
+          timeLogs={timeLogs}
+          onClockOut={handleClockOut}
+        />
 
         {/* Routed views */}
         {activeView === 'dashboard' && (

@@ -11,7 +11,9 @@ import {
   Banknote,
   AlertTriangle,
   CheckCircle2,
-  Settings2
+  Settings2,
+  RotateCcw,
+  History
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { formatMoney } from '../invoiceUtils';
@@ -44,6 +46,7 @@ export default function Payroll({ profiles = [], timeLogs = [], currentUserProfi
   const [runs, setRuns] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [salaryForm, setSalaryForm] = useState(null);
   const [runForm, setRunForm] = useState(null);
@@ -87,6 +90,22 @@ export default function Payroll({ profiles = [], timeLogs = [], currentUserProfi
     acc.net += Number(r.net_pay) || 0;
     return acc;
   }, { gross: 0, deductions: 0, net: 0 });
+  const history = useMemo(() => {
+    const byMonth = {};
+    runs.forEach(r => {
+      const entry = byMonth[r.month] || { month: r.month, count: 0, gross: 0, deductions: 0, net: 0, draft: 0, finalized: 0, paid: 0 };
+      entry.count += 1;
+      entry.gross += Number(r.gross_pay) || 0;
+      entry.deductions += Number(r.total_deductions) || 0;
+      entry.net += Number(r.net_pay) || 0;
+      if (r.status === 'Draft') entry.draft += 1;
+      else if (r.status === 'Finalized') entry.finalized += 1;
+      else if (r.status === 'Paid') entry.paid += 1;
+      byMonth[r.month] = entry;
+    });
+    return Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month));
+  }, [runs]);
+
   const attentionCount = rows.filter(r => r.auto && (r.auto.unmarkedDays > 0 || r.auto.openLogs > 0)).length;
 
   const buildRunPayload = (row, existing) => {
@@ -132,9 +151,36 @@ export default function Payroll({ profiles = [], timeLogs = [], currentUserProfi
     if (failure) alert(`Some payslips could not be saved: ${failure}`);
   };
 
+  // Removes this month's unpaid payslips (Draft and Finalized) so the month can be
+  // calculated again from scratch. Paid payslips are kept as a record.
+  const handleResetMonth = async () => {
+    const resettable = monthRuns.filter(r => r.status !== 'Paid');
+    const keptPaid = monthRuns.length - resettable.length;
+    if (resettable.length === 0) {
+      alert(keptPaid ? 'Every payslip this month is already Paid. Use "Undo paid" on a row first.' : 'Nothing to reset for this month.');
+      return;
+    }
+    const proceed = confirm(
+      `Delete ${resettable.length} unpaid payslip(s) for ${monthLabel(month)}?` +
+      (keptPaid ? ` ${keptPaid} paid payslip(s) will be kept.` : '') +
+      ' Manual additions, deductions and notes on them will be lost. Salary setups are not affected.'
+    );
+    if (!proceed) return;
+    setBusy(true);
+    const { error } = await supabase
+      .from('payroll_runs')
+      .delete()
+      .eq('month', month)
+      .neq('status', 'Paid');
+    await load();
+    setBusy(false);
+    if (error) alert(`Could not reset the month: ${error.message}`);
+  };
+
   const handleSetStatus = async (row, nextStatus) => {
     const { run, auto } = row;
-    if (nextStatus === 'Finalized' && auto && (auto.unmarkedDays > 0 || auto.openLogs > 0)) {
+    const isFinalizingDraft = nextStatus === 'Finalized' && run.status === 'Draft';
+    if (isFinalizingDraft && auto && (auto.unmarkedDays > 0 || auto.openLogs > 0)) {
       const proceed = confirm(
         `${row.profile.full_name} has ${auto.unmarkedDays} unmarked day(s) and ${auto.openLogs} open time log(s) this month. ` +
         'Unmarked days are NOT deducted. Finalize anyway?'
@@ -143,7 +189,7 @@ export default function Payroll({ profiles = [], timeLogs = [], currentUserProfi
     }
     setBusy(true);
     // Finalizing re-reads attendance so the payslip matches the latest marks.
-    const payload = nextStatus === 'Finalized' && auto ? buildRunPayload(row, run) : {};
+    const payload = isFinalizingDraft && auto ? buildRunPayload(row, run) : {};
     const update = {
       ...payload,
       status: nextStatus,
@@ -262,10 +308,66 @@ export default function Payroll({ profiles = [], timeLogs = [], currentUserProfi
           <span style={{ fontWeight: 700, minWidth: '140px', textAlign: 'center' }}>{monthLabel(month)}</span>
           <button style={s.navBtn} onClick={() => setMonth(shiftMonthKey(month, 1))}><ChevronRight size={16} /></button>
         </div>
-        <button className="btn-primary" onClick={handleCalculate} disabled={busy}>
-          <Calculator size={15} /> {busy ? 'Working...' : 'Calculate month'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button className="btn-secondary" onClick={() => setShowHistory(v => !v)}>
+            <History size={15} /> {showHistory ? 'Hide history' : 'History'}
+          </button>
+          <button className="btn-secondary" onClick={handleResetMonth} disabled={busy}>
+            <RotateCcw size={15} /> Reset month
+          </button>
+          <button className="btn-primary" onClick={handleCalculate} disabled={busy}>
+            <Calculator size={15} /> {busy ? 'Working...' : 'Calculate month'}
+          </button>
+        </div>
       </div>
+
+      {showHistory && (
+        <div className="glass-panel" style={{ padding: '8px' }}>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th style={{ textAlign: 'right' }}>Payslips</th>
+                  <th style={{ textAlign: 'right' }}>Gross</th>
+                  <th style={{ textAlign: 'right' }}>Deductions</th>
+                  <th style={{ textAlign: 'right' }}>Net pay</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map(entry => (
+                  <tr key={entry.month}>
+                    <td style={{ fontWeight: 600 }}>{monthLabel(entry.month)}</td>
+                    <td style={{ textAlign: 'right' }}>{entry.count}</td>
+                    <td style={{ textAlign: 'right' }}>{formatMoney(entry.gross)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatMoney(entry.deductions)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatMoney(entry.net)}</td>
+                    <td style={{ fontSize: 'var(--font-size-xs)' }}>
+                      {entry.paid > 0 && <span style={{ color: STATUS_COLORS.Paid }}>{entry.paid} paid </span>}
+                      {entry.finalized > 0 && <span style={{ color: STATUS_COLORS.Finalized }}>{entry.finalized} finalized </span>}
+                      {entry.draft > 0 && <span style={{ color: STATUS_COLORS.Draft }}>{entry.draft} draft</span>}
+                    </td>
+                    <td>
+                      <button
+                        className="btn-secondary"
+                        style={s.smallBtn}
+                        onClick={() => { setMonth(entry.month); setShowHistory(false); }}
+                      >
+                        Open
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {history.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>No payroll has been calculated yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {loadError && (
         <div className="glass-panel" style={s.warning}>
@@ -369,6 +471,11 @@ export default function Payroll({ profiles = [], timeLogs = [], currentUserProfi
                       {run && run.status === 'Draft' && (
                         <button className="btn-secondary" style={s.smallBtn} disabled={busy} onClick={() => handleSetStatus({ profile, salary, run, auto }, 'Finalized')}>
                           <CheckCircle2 size={13} /> Finalize
+                        </button>
+                      )}
+                      {run && run.status === 'Paid' && (
+                        <button className="btn-secondary" style={s.smallBtn} disabled={busy} onClick={() => handleSetStatus({ profile, salary, run, auto }, 'Finalized')}>
+                          Undo paid
                         </button>
                       )}
                       {run && run.status === 'Finalized' && (

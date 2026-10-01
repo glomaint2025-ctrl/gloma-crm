@@ -278,6 +278,15 @@ Coordinator & Accountant; add a dedicated Company Finance tab for the same three
 * **SQL to run, in order**: `supabase_phase1_clients_invoices_plans.sql`, then `supabase_phase2_payroll_finance.sql` (both idempotent; validated against a local Postgres including RLS checks).
 * **Open questions/assumptions to confirm**: annual/casual/sick entitlement is 14/7/7; overtime has no weekly/monthly cap in the code; employees cannot see their own payslip in the UI yet (the RLS policy already allows reading finalized ones).
 
+### Problem 16 — Work-hours reminder, desktop app, payroll reset/history (2026-10-01)
+
+* **EOD form**: client dropdown has an "Other..." option (type the name) and time is entered as hours + minutes (stored as decimal hours in `daily_updates.hours_spent`, shown as "2h 45m").
+* **Holidays**: only Sundays and Poya days (`POYA_DAYS` in `src/workHours.js`, 2026-2027). Add the next year's Poya list before January.
+* **Reminder** (`ClockReminder.jsx`): when an employee's timer is still running after closing time (17:00 weekdays, 15:30 Saturday; none on Sundays/holidays) a banner and a system notification appear: Stop now / remind in 15 min / working overtime (suppresses the rest of the day). In the desktop app it also brings the window to the front.
+* **Payroll**: Reset month (deletes Draft/Finalized payslips of the month, keeps Paid), Undo paid, and a History table of all months.
+* **Desktop app** (`desktop/`): Electron wrapper around the live site, builds a Windows installer with `npm run dist` (see `desktop/README.md`). Unsigned, so SmartScreen warns once. The built `.exe` and `node_modules` are git-ignored.
+* **SQL**: `supabase_seed_salaries.sql` (starting salaries) and `supabase_reset_work_hours.sql` (archives then clears `time_logs`; restore instructions inside).
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
