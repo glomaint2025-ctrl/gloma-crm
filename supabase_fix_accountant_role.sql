@@ -7,6 +7,11 @@
 -- Safe to re-run.
 -- ============================================================================
 
+-- Older setups put a hard-coded list of allowed roles on profiles (profiles_role_check)
+-- that does not know 'Coordinator & Accountant'. Drop it; roles are validated by the app
+-- (Manage Roles dropdown) and the Developer-role trigger instead.
+alter table public.profiles drop constraint if exists profiles_role_check;
+
 update public.profiles
 set role = 'Coordinator & Accountant'
 where role = 'Accountant';
