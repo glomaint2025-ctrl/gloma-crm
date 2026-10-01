@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Calendar, User, BookOpen, Clock, FileText, Send, Trash2, ShieldAlert } from 'lucide-react';
 
+const OTHER_CLIENT = '__other';
+
 export default function DailyUpdates({ 
   updates = [], 
   tasks = [], 
@@ -17,7 +19,9 @@ export default function DailyUpdates({
   const [taskId, setTaskId] = useState('');
   const [clientProject, setClientProject] = useState('');
   const [workCompleted, setWorkCompleted] = useState('');
-  const [hoursSpent, setHoursSpent] = useState('');
+  const [hoursPart, setHoursPart] = useState('');
+  const [minutesPart, setMinutesPart] = useState('');
+  const [isOtherClient, setIsOtherClient] = useState(false);
   const [statusAtEnd, setStatusAtEnd] = useState('In Progress');
   const [nextStep, setNextStep] = useState('');
   const [blockers, setBlockers] = useState('');
@@ -43,12 +47,31 @@ export default function DailyUpdates({
     ...clients.filter(c => c.status === 'Active').map(c => c.name),
     'Gloma General'
   ];
-  if (clientProject && !clientOptions.includes(clientProject)) {
+  if (!isOtherClient && clientProject && !clientOptions.includes(clientProject)) {
     clientOptions.push(clientProject);
   }
 
+  // "5 h 30 m" style display for the stored decimal hours.
+  const formatHoursSpent = (decimalHours) => {
+    const totalMinutes = Math.round((Number(decimalHours) || 0) * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return [h ? `${h}h` : '', m ? `${m}m` : ''].filter(Boolean).join(' ') || '0m';
+  };
+
+  const handleClientChange = (value) => {
+    if (value === OTHER_CLIENT) {
+      setIsOtherClient(true);
+      setClientProject('');
+    } else {
+      setIsOtherClient(false);
+      setClientProject(value);
+    }
+  };
+
   const handleTaskChange = (selectedTaskId) => {
     setTaskId(selectedTaskId);
+    setIsOtherClient(false);
     const selectedTask = tasks.find(t => t.id === selectedTaskId);
     if (selectedTask) {
       setClientProject(selectedTask.client_project || '');
@@ -66,6 +89,12 @@ export default function DailyUpdates({
       return;
     }
 
+    if (isOtherClient && !clientProject.trim()) {
+      alert('Please type the client or project name.');
+      return;
+    }
+
+    const totalMinutes = (parseInt(hoursPart, 10) || 0) * 60 + (parseInt(minutesPart, 10) || 0);
     const matchedTask = tasks.find(t => t.id === taskId);
     
     // Package update
@@ -74,9 +103,9 @@ export default function DailyUpdates({
       employee_id: currentUserProfile.id,
       employee_name: currentUserProfile.full_name,
       task_id: taskId || null,
-      client_project: clientProject || (matchedTask ? matchedTask.client_project : 'Gloma General'),
+      client_project: clientProject.trim() || (matchedTask ? matchedTask.client_project : 'Gloma General'),
       work_completed: workCompleted,
-      hours_spent: parseFloat(hoursSpent) || 0,
+      hours_spent: Math.round((totalMinutes / 60) * 100) / 100,
       status_at_end: statusAtEnd,
       next_step: nextStep,
       blockers: blockers,
@@ -89,7 +118,9 @@ export default function DailyUpdates({
     setTaskId('');
     setClientProject('');
     setWorkCompleted('');
-    setHoursSpent('');
+    setHoursPart('');
+    setMinutesPart('');
+    setIsOtherClient(false);
     setNextStep('');
     setBlockers('');
     setEvidenceLink('');
@@ -136,18 +167,30 @@ export default function DailyUpdates({
               </div>
 
               <div style={{ flex: 1 }}>
-                <label style={styles.formLabel}>Hours Spent</label>
-                <div style={styles.inputWrapper}>
-                  <Clock size={16} style={styles.inputIcon} />
+                <label style={styles.formLabel}>Time Spent</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ ...styles.inputWrapper, flex: 1 }}>
+                    <Clock size={16} style={styles.inputIcon} />
+                    <input
+                      type="number"
+                      min="0"
+                      max="24"
+                      placeholder="Hours"
+                      value={hoursPart}
+                      onChange={(e) => setHoursPart(e.target.value)}
+                      className="form-input"
+                      style={{ paddingLeft: '38px' }}
+                    />
+                  </div>
                   <input
                     type="number"
-                    step="0.5"
                     min="0"
-                    placeholder="e.g. 3.5"
-                    value={hoursSpent}
-                    onChange={(e) => setHoursSpent(e.target.value)}
+                    max="59"
+                    placeholder="Minutes"
+                    value={minutesPart}
+                    onChange={(e) => setMinutesPart(e.target.value)}
                     className="form-input"
-                    style={{ paddingLeft: '38px' }}
+                    style={{ flex: 1 }}
                   />
                 </div>
               </div>
@@ -171,15 +214,27 @@ export default function DailyUpdates({
               <div style={{ flex: 1 }}>
                 <label style={styles.formLabel}>Client / Project</label>
                 <select
-                  value={clientProject}
-                  onChange={(e) => setClientProject(e.target.value)}
+                  value={isOtherClient ? OTHER_CLIENT : clientProject}
+                  onChange={(e) => handleClientChange(e.target.value)}
                   className="form-input"
                 >
                   <option value="">Select client...</option>
                   {clientOptions.map(name => (
                     <option key={name} value={name}>{name}</option>
                   ))}
+                  <option value={OTHER_CLIENT}>Other...</option>
                 </select>
+                {isOtherClient && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type the client or project name"
+                    value={clientProject}
+                    onChange={(e) => setClientProject(e.target.value)}
+                    className="form-input"
+                    style={{ marginTop: '8px' }}
+                  />
+                )}
               </div>
             </div>
 
@@ -304,7 +359,7 @@ export default function DailyUpdates({
                   <span style={styles.projectTag}>{upd.client_project}</span>
                   {upd.hours_spent > 0 && (
                     <span style={styles.hoursTag}>
-                      <Clock size={9} /> {upd.hours_spent} hrs
+                      <Clock size={9} /> {formatHoursSpent(upd.hours_spent)}
                     </span>
                   )}
                   {upd.task_id && <span style={styles.taskTag}>{upd.task_id}</span>}
