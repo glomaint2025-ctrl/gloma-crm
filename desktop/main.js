@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, session } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, session, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 
@@ -9,6 +10,7 @@ const APP_ID = 'lk.gloma.crm';
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let manualUpdateCheck = false;
 
 // The CRM itself is the live website, so every Vercel deploy reaches the desktop
 // app automatically; this shell only adds the window, tray, startup and reminders.
@@ -89,6 +91,64 @@ function createWindow() {
   });
 }
 
+// The CRM website updates itself on every deploy. This updates the desktop shell
+// (tray, icon, startup, reminders) from the newest GitHub Release of the repo.
+function setupAutoUpdate() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-downloaded', (info) => {
+    manualUpdateCheck = false;
+    dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Gloma CRM update',
+      message: `Version ${info.version} is ready to install.`,
+      detail: 'Restart to finish updating. It will also install automatically the next time the app quits.'
+    }).then((result) => {
+      if (result.response === 0) {
+        isQuitting = true;
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    if (manualUpdateCheck) {
+      manualUpdateCheck = false;
+      dialog.showMessageBox({ type: 'info', message: 'Gloma CRM is up to date.', detail: `Version ${app.getVersion()}` });
+    }
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-update error:', err && err.message);
+    if (manualUpdateCheck) {
+      manualUpdateCheck = false;
+      dialog.showMessageBox({ type: 'warning', message: 'Could not check for updates.', detail: 'Check your internet connection and try again.' });
+    }
+  });
+
+  const check = () => autoUpdater.checkForUpdates().catch((err) => {
+    console.error('Update check failed:', err && err.message);
+  });
+
+  check();
+  setInterval(check, 4 * 60 * 60 * 1000);
+}
+
+function checkForUpdatesNow() {
+  if (!app.isPackaged) {
+    dialog.showMessageBox({ type: 'info', message: 'Updates are only checked in the installed app.' });
+    return;
+  }
+  manualUpdateCheck = true;
+  autoUpdater.checkForUpdates().catch(() => {});
+}
+
 function startsWithWindows() {
   return app.getLoginItemSettings().openAtLogin;
 }
@@ -104,6 +164,7 @@ function buildTrayMenu() {
         app.setLoginItemSettings({ openAtLogin: item.checked, args: ['--hidden'] });
       }
     },
+    { label: `Check for updates (v${app.getVersion()})`, click: () => checkForUpdatesNow() },
     { type: 'separator' },
     {
       label: 'Quit',
@@ -148,6 +209,7 @@ app.whenReady().then(() => {
 
   createTray();
   createWindow();
+  setupAutoUpdate();
 
   // Launched by Windows at login: stay in the tray until the reminder needs the window.
   if (process.argv.includes('--hidden') && mainWindow) {

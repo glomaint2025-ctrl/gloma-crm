@@ -1,13 +1,14 @@
 {
   "name": "gloma-crm-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Gloma CRM desktop app",
   "author": "Gloma International Pvt Ltd",
   "private": true,
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis --publish never",
+    "release": "electron-builder --win nsis --publish always"
   },
   "build": {
     "appId": "lk.gloma.crm",
@@ -31,10 +32,20 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Gloma CRM"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "glomaint2025-ctrl",
+        "repo": "gloma-crm"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

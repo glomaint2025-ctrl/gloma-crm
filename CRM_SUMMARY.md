@@ -287,6 +287,11 @@ Coordinator & Accountant; add a dedicated Company Finance tab for the same three
 * **Desktop app** (`desktop/`): Electron wrapper around the live site, builds a Windows installer with `npm run dist` (see `desktop/README.md`). Unsigned, so SmartScreen warns once. The built `.exe` and `node_modules` are git-ignored.
 * **SQL**: `supabase_seed_salaries.sql` (starting salaries) and `supabase_reset_work_hours.sql` (archives then clears `time_logs`; restore instructions inside).
 
+### Problem 17 — Update flow for the desktop app (2026-10-01)
+
+* Website updates reach the desktop app automatically (it loads the live site). `UpdateBanner.jsx` polls `/version.json` (emitted by `vite.config.js` with a per-build id) and shows "Reload to update" when a newer deploy exists.
+* The Electron shell now uses `electron-updater` against GitHub Releases of this (public) repo, version 1.1.0. See `desktop/README.md` for the release steps. Legacy role fix: `supabase_fix_accountant_role.sql`.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.

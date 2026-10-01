@@ -15,6 +15,7 @@ import WorkHours from './components/WorkHours';
 import Finance from './components/Finance';
 import Invoices from './components/Invoices';
 import ClockReminder from './components/ClockReminder';
+import UpdateBanner from './components/UpdateBanner';
 import { splitWorkedMinutes, isHoliday, getClosingTime, todayStr, OFFICE_OPEN_TIME } from './workHours';
 
 import {
@@ -783,7 +784,12 @@ export default function App() {
   }
 
   if (!sessionUser) {
-    return <Login onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <>
+        <Login onAuthSuccess={handleAuthSuccess} />
+        <UpdateBanner />
+      </>
+    );
   }
 
   return (
@@ -953,6 +959,8 @@ export default function App() {
             </span>
           </div>
         )}
+
+        <UpdateBanner />
 
         <ClockReminder
           currentUserProfile={currentUserProfile}

@@ -13,6 +13,29 @@ What the wrapper adds:
 - Native notifications and bringing the window to the front for reminders.
 - A friendly "can't reach Gloma CRM" page with a retry button when offline.
 
+## Two kinds of updates
+
+1. **Website changes** (almost everything): push to `main`, Vercel deploys, and the app shows a
+   "A new version of Gloma CRM is available - Reload to update" banner within a few minutes
+   (or on the next launch). Nothing to install.
+2. **Desktop shell changes** (this `desktop/` folder: tray, icon, startup, reminders): publish a
+   new GitHub Release. Installed apps check on start and every 4 hours, download the update in
+   the background and ask the user to restart. Tray menu -> "Check for updates" does it on demand.
+
+### Publish a shell update
+
+1. Raise `version` in `desktop/package.json` (for example 1.1.0 -> 1.1.1) and commit/push.
+2. Build: `cd desktop && npm run dist`.
+3. On GitHub create a Release for the repo with tag `v1.1.1` and upload these three files from
+   `desktop/dist-installer/`: `Gloma CRM Setup 1.1.1.exe`, `Gloma CRM Setup 1.1.1.exe.blockmap`
+   and `latest.yml`. Publish it (not as draft or pre-release).
+
+Or let the build upload them for you: create a GitHub token with repo access, then run
+`set GH_TOKEN=<token>` and `npm run release` (creates a draft release; publish it on GitHub).
+
+The repository is public, so the updater needs no token. Employees who still have version 1.0.0
+(no updater) must install a newer installer once by hand.
+
 ## Build the installer
 
 ```bash
