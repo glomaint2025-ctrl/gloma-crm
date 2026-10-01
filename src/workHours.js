@@ -7,39 +7,39 @@ export const OFFICE_OPEN_TIME = '08:30';
 export const WEEKDAY_CLOSE_TIME = '17:00';
 export const SATURDAY_CLOSE_TIME = '15:30';
 
-// Best-effort 2026 Sri Lanka public/bank/mercantile holiday + Poya list, compiled
-// from published 2026 calendar sources. Five of these (Islamic feasts and the
-// Sinhala/Tamil New Year) are moon-sighting-dependent and can shift by a day --
-// double check against the official government gazette if exact accuracy matters
-// for payroll.
-export const SRI_LANKA_HOLIDAYS_2026 = [
+// Company holidays are Sundays and Poya (full moon) days only; other mercantile and
+// public holidays are normal working days. Poya dates for 2026-2027 are taken from
+// the published Sri Lanka Poya calendar (publicholidays.lk). Add the next year's list
+// here before January, otherwise only Sundays will count as holidays.
+export const POYA_DAYS = [
   { date: '2026-01-03', name: 'Duruthu Full Moon Poya Day' },
-  { date: '2026-01-14', name: 'Tamil Thai Pongal Day' },
-  { date: '2026-02-02', name: 'Navam Full Moon Poya Day' },
-  { date: '2026-02-04', name: 'National Day' },
-  { date: '2026-02-17', name: 'Mahasivarathri Day' },
-  { date: '2026-03-03', name: 'Madin Full Moon Poya Day' },
-  { date: '2026-03-20', name: 'Id Ul-Fitr (Ramazan Festival)' },
-  { date: '2026-04-02', name: 'Bak Full Moon Poya Day' },
-  { date: '2026-04-03', name: 'Good Friday' },
-  { date: '2026-04-13', name: 'Day Prior to Sinhala & Tamil New Year' },
-  { date: '2026-04-14', name: 'Sinhala & Tamil New Year Day' },
-  { date: '2026-05-01', name: 'May Day & Vesak Full Moon Poya' },
-  { date: '2026-05-02', name: 'Day Following Vesak Poya' },
-  { date: '2026-05-27', name: 'Id Ul-Alha (Hajj Festival)' },
-  { date: '2026-06-01', name: 'Poson Full Moon Poya Day' },
-  { date: '2026-06-30', name: 'Esala Full Moon Poya Day' },
-  { date: '2026-07-29', name: 'Nikini Full Moon Poya Day' },
-  { date: '2026-08-25', name: "Milad un-Nabi (Prophet's Birthday)" },
-  { date: '2026-08-27', name: 'Binara Full Moon Poya Day' },
-  { date: '2026-09-26', name: 'Vap Full Moon Poya Day' },
-  { date: '2026-10-25', name: 'Il Full Moon Poya Day' },
-  { date: '2026-11-09', name: 'Deepavali Festival Day' },
-  { date: '2026-11-24', name: 'Unduvap Full Moon Poya Day' },
-  { date: '2026-12-25', name: 'Christmas Day' }
+  { date: '2026-02-01', name: 'Navam Full Moon Poya Day' },
+  { date: '2026-03-02', name: 'Madin Full Moon Poya Day' },
+  { date: '2026-04-01', name: 'Bak Full Moon Poya Day' },
+  { date: '2026-05-01', name: 'Vesak Full Moon Poya Day' },
+  { date: '2026-05-30', name: 'Adhi Poson Full Moon Poya Day' },
+  { date: '2026-06-29', name: 'Poson Full Moon Poya Day' },
+  { date: '2026-07-29', name: 'Esala Full Moon Poya Day' },
+  { date: '2026-08-27', name: 'Nikini Full Moon Poya Day' },
+  { date: '2026-09-26', name: 'Binara Full Moon Poya Day' },
+  { date: '2026-10-25', name: 'Vap Full Moon Poya Day' },
+  { date: '2026-11-24', name: 'Ill Full Moon Poya Day' },
+  { date: '2026-12-23', name: 'Unduvap Full Moon Poya Day' },
+  { date: '2027-01-22', name: 'Duruthu Full Moon Poya Day' },
+  { date: '2027-02-20', name: 'Navam Full Moon Poya Day' },
+  { date: '2027-03-21', name: 'Madin Full Moon Poya Day' },
+  { date: '2027-04-20', name: 'Bak Full Moon Poya Day' },
+  { date: '2027-05-20', name: 'Vesak Full Moon Poya Day' },
+  { date: '2027-06-18', name: 'Poson Full Moon Poya Day' },
+  { date: '2027-07-18', name: 'Esala Full Moon Poya Day' },
+  { date: '2027-08-16', name: 'Nikini Full Moon Poya Day' },
+  { date: '2027-09-15', name: 'Binara Full Moon Poya Day' },
+  { date: '2027-10-15', name: 'Vap Full Moon Poya Day' },
+  { date: '2027-11-13', name: 'Ill Full Moon Poya Day' },
+  { date: '2027-12-13', name: 'Unduvap Full Moon Poya Day' }
 ];
 
-const holidayMap = new Map(SRI_LANKA_HOLIDAYS_2026.map(h => [h.date, h.name]));
+const holidayMap = new Map(POYA_DAYS.map(h => [h.date, h.name]));
 
 export function isSunday(dateStr) {
   return new Date(`${dateStr}T00:00:00`).getDay() === 0;
@@ -49,8 +49,8 @@ export function isSaturday(dateStr) {
   return new Date(`${dateStr}T00:00:00`).getDay() === 6;
 }
 
-// Returns { date, name } if dateStr (YYYY-MM-DD) is a Sunday or a gazetted
-// holiday, otherwise null.
+// Returns { date, name } if dateStr (YYYY-MM-DD) is a Sunday or a Poya day,
+// otherwise null.
 export function getHoliday(dateStr) {
   if (isSunday(dateStr)) return { date: dateStr, name: 'Sunday' };
   const name = holidayMap.get(dateStr);

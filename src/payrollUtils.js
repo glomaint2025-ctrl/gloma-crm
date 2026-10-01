@@ -3,7 +3,7 @@ import { isHoliday, getHoliday, getClosingTime } from './workHours';
 // ---- Payroll rules (adjust here if company policy or the law changes) ----------
 // Overtime: 1.5x the ordinary hourly rate, where hourly = basic salary / 240
 // (the usual Sri Lankan Shop & Office convention). Applied to every overtime
-// minute, including Sundays and gazetted holidays.
+// minute, including Sundays and Poya days.
 export const OT_MULTIPLIER = 1.5;
 export const OT_HOURLY_DIVISOR = 240;
 // Value of one unpaid day when deducting no-pay leave: monthly basic / 30.
