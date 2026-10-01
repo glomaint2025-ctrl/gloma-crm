@@ -24,17 +24,14 @@ What the wrapper adds:
 
 ### Publish a shell update
 
-1. Raise `version` in `desktop/package.json` (for example 1.1.0 -> 1.1.1) and commit/push.
-2. Build: `cd desktop && npm run dist`.
-3. On GitHub create a Release for the repo with tag `v1.1.1` and upload these three files from
-   `desktop/dist-installer/`: `Gloma CRM Setup 1.1.1.exe`, `Gloma CRM Setup 1.1.1.exe.blockmap`
-   and `latest.yml`. Publish it (not as draft or pre-release).
+1. Raise `version` in `desktop/package.json` (for example 1.1.0 -> 1.1.1).
+2. `cd desktop`, then `npm run dist` (builds the installer).
+3. `npm run publish-release` (creates the GitHub Release `v<version>` and uploads the three
+   files the updater needs, using the GitHub login git already has saved).
 
-Or let the build upload them for you: create a GitHub token with repo access, then run
-`set GH_TOKEN=<token>` and `npm run release` (creates a draft release; publish it on GitHub).
-
-The repository is public, so the updater needs no token. Employees who still have version 1.0.0
-(no updater) must install a newer installer once by hand.
+Installed apps then find it on their next check and offer the update. The repository is public,
+so the updater needs no token. Anyone still on version 1.0.0 (no updater) must install a newer
+installer once by hand.
 
 ## Build the installer
 
