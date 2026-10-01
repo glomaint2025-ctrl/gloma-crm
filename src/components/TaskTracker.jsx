@@ -26,6 +26,7 @@ const localTranslations = {
     viewBoard: "Kanban Board",
     viewTable: "List View",
     newTask: "New Task",
+    newMyTask: "Add My Task",
     colPendingApproval: "Pending Approval",
     colApproved: "Approved",
     colInProgress: "In Progress",
@@ -63,6 +64,7 @@ const localTranslations = {
     viewBoard: "බෝඩ් දසුන",
     viewTable: "ලැයිස්තු දසුන",
     newTask: "නව කාර්යයක්",
+    newMyTask: "මගේ කාර්යයක් එක් කරන්න",
     colPendingApproval: "අනුමැතිය සඳහා",
     colApproved: "අනුමතයි",
     colInProgress: "සිදුවෙමින් පවතී",
@@ -100,6 +102,7 @@ const localTranslations = {
     viewBoard: "போர்டு காட்சி",
     viewTable: "பட்டியல் காட்சி",
     newTask: "புதிய பணி",
+    newMyTask: "எனது பணியைச் சேர்",
     colPendingApproval: "ஒப்புதலுக்காகக் காத்திருக்கிறது",
     colApproved: "அங்கீகரிக்கப்பட்டது",
     colInProgress: "செயல்பாட்டில் உள்ளது",
@@ -176,6 +179,11 @@ export default function TaskTracker({
   const hasDeletePrivilege = userRole === 'Developer';
   // Who can mark a website task Paid / Not Paid.
   const canManagePayment = userRole === 'Developer' || userRole === 'Admin' || userRole === 'Manager' || userRole === 'Coordinator & Accountant';
+  // Employees may plan their own work: they can fully edit tasks they created for
+  // themselves, but only update status/progress/notes on tasks assigned by others.
+  const canEditCore = hasAssignPrivilege
+    || editingTask === null
+    || (editingTask.created_by && editingTask.created_by === currentUserProfile?.id);
 
   // Apply filters
   const filteredTasks = tasks.filter(task => {
@@ -257,10 +265,6 @@ export default function TaskTracker({
       setPaymentStatus(task.payment_status || 'Not Paid');
       setPaymentAmount(task.payment_amount != null ? String(task.payment_amount) : '');
     } else {
-      if (!hasAssignPrivilege) {
-        alert("Only Administrators or Developers can create new tasks.");
-        return;
-      }
       setEditingTask(null);
       const datePart = new Date().toISOString().substring(2, 10).replace(/-/g, '');
       const randPart = Math.floor(100 + Math.random() * 900);
@@ -268,9 +272,10 @@ export default function TaskTracker({
       setClientProject('');
       setWorkType('Post');
       setTaskDetail('');
-      setAssignedEmployee('');
+      // Employees can only create tasks for themselves and start them right away.
+      setAssignedEmployee(hasAssignPrivilege ? '' : currentUserProfile.id);
       setTaskPriority('Normal');
-      setTaskStatus('Pending Approval');
+      setTaskStatus(hasAssignPrivilege ? 'Pending Approval' : 'In Progress');
       setTaskProgress(0);
       setTodaysUpdate('');
       setBlockersNotes('');
@@ -294,7 +299,9 @@ export default function TaskTracker({
 
     let selectedEmpId = null;
     let selectedEmpName = '';
-    const foundProfile = profiles.find(p => p.id === assignedEmployee);
+    // Without assign privilege the assignee is always the current user.
+    const effectiveAssignee = hasAssignPrivilege || editingTask ? assignedEmployee : currentUserProfile.id;
+    const foundProfile = profiles.find(p => p.id === effectiveAssignee);
     if (foundProfile) {
       selectedEmpId = foundProfile.id;
       selectedEmpName = foundProfile.full_name;
@@ -330,6 +337,9 @@ export default function TaskTracker({
       payment_amount: workType === 'Website' && paymentAmount !== '' ? parseFloat(paymentAmount) : null,
       last_updated: new Date().toISOString()
     };
+    if (!editingTask && !hasAssignPrivilege) {
+      taskObj.created_by = currentUserProfile.id;
+    }
 
     const result = await onSaveTask(taskObj);
     if (result && result.success === false) {
@@ -340,7 +350,8 @@ export default function TaskTracker({
 
     // Automation: if task is assigned/updated to a teammate, issue notification log in supabase
     // and send them an email via EmailJS. Only after the task itself actually saved.
-    if (selectedEmpId && (!editingTask || editingTask.employee_id !== selectedEmpId)) {
+    const isSelfAssigned = selectedEmpId === currentUserProfile?.id;
+    if (selectedEmpId && !isSelfAssigned && (!editingTask || editingTask.employee_id !== selectedEmpId)) {
       try {
         await supabase.from('notifications').insert({
           user_id: selectedEmpId,
@@ -488,11 +499,9 @@ export default function TaskTracker({
           </button>
         </div>
 
-        {hasAssignPrivilege && (
-          <button onClick={() => openTaskModal(null)} className="btn-primary">
-            <Plus size={16} /> {t.newTask}
-          </button>
-        )}
+        <button onClick={() => openTaskModal(null)} className="btn-primary">
+          <Plus size={16} /> {hasAssignPrivilege ? t.newTask : t.newMyTask}
+        </button>
       </div>
 
       {/* Kanban Board View */}
@@ -733,7 +742,7 @@ export default function TaskTracker({
 
                 <div style={{ flex: 1 }}>
                   <label style={styles.modalLabel}>{t.clientLabel}</label>
-                  {hasAssignPrivilege ? (
+                  {canEditCore ? (
                     <select
                       required
                       value={clientProject}
@@ -760,7 +769,7 @@ export default function TaskTracker({
               <div style={styles.formRow}>
                 <div style={{ flex: 1 }}>
                   <label style={styles.modalLabel}>{t.workTypeLabel}</label>
-                  {hasAssignPrivilege ? (
+                  {canEditCore ? (
                     <select
                       value={workType}
                       onChange={(e) => setWorkType(e.target.value)}
@@ -863,7 +872,7 @@ export default function TaskTracker({
                 <textarea
                   required
                   rows={2}
-                  readOnly={!hasAssignPrivilege}
+                  readOnly={!canEditCore}
                   placeholder="Insert captions description, links specifications or developers instruction"
                   value={taskDetail}
                   onChange={(e) => setTaskDetail(e.target.value)}
@@ -875,7 +884,7 @@ export default function TaskTracker({
               <div style={styles.formRow}>
                 <div style={{ flex: 1 }}>
                   <label style={styles.modalLabel}>{t.priorityLabel}</label>
-                  {hasAssignPrivilege ? (
+                  {canEditCore ? (
                     <select
                       value={taskPriority}
                       onChange={(e) => setTaskPriority(e.target.value)}
@@ -894,7 +903,7 @@ export default function TaskTracker({
                   <label style={styles.modalLabel}>{t.startDate}</label>
                   <input
                     type="date"
-                    readOnly={!hasAssignPrivilege}
+                    readOnly={!canEditCore}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                     className="form-input"
@@ -906,7 +915,7 @@ export default function TaskTracker({
                   <input
                     type="date"
                     required
-                    readOnly={!hasAssignPrivilege}
+                    readOnly={!canEditCore}
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                     className="form-input"

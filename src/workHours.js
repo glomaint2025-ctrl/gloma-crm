@@ -105,6 +105,9 @@ export function formatMinutes(mins) {
   return `${h}h ${m}m`;
 }
 
+// Today's date in the device's local timezone (not UTC), as YYYY-MM-DD.
 export function todayStr() {
-  return new Date().toISOString().substring(0, 10);
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

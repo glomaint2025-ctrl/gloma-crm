@@ -1,15 +1,47 @@
-import React, { useState } from 'react';
-import { supabase, isUsingMock } from '../supabaseClient';
-import { Mail, Lock, UserPlus, LogIn, AlertCircle, Cpu } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { supabase, isUsingMock, checkBackendReachable } from '../supabaseClient';
+import { Mail, Lock, UserPlus, LogIn, AlertCircle, Cpu, WifiOff } from 'lucide-react';
+
+// Turn raw Supabase/network errors into something an employee can act on.
+const friendlyAuthError = (error) => {
+  const msg = (error?.message || '').toLowerCase();
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network request failed')) {
+    return 'Cannot reach the login server. Check your internet connection; if it keeps happening, tell the Developer.';
+  }
+  if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
+    return 'Incorrect email or password.';
+  }
+  if (msg.includes('email not confirmed')) {
+    return 'Your email is not verified yet. Open the verification link we emailed you, then sign in.';
+  }
+  if (msg.includes('rate limit') || msg.includes('too many')) {
+    return 'Too many attempts. Please wait a few minutes and try again.';
+  }
+  if (msg.includes('already registered') || msg.includes('already exists')) {
+    return 'An account with this email already exists. Try signing in instead.';
+  }
+  if (msg.includes('password should be')) {
+    return error.message;
+  }
+  return error?.message || 'Login failed. Please double check credentials.';
+};
 
 export default function Login({ onAuthSuccess }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [defaultRole, setDefaultRole] = useState('Employee');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [backendDown, setBackendDown] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    checkBackendReachable().then((ok) => {
+      if (!cancelled) setBackendDown(!ok);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,9 +54,10 @@ export default function Login({ onAuthSuccess }) {
           email,
           password,
           options: {
+            // Role is never self-assigned: new accounts start as Employee and an
+            // Admin/Developer promotes them from Manage Roles.
             data: {
-              full_name: fullName,
-              role: defaultRole
+              full_name: fullName
             }
           }
         });
@@ -45,7 +78,7 @@ export default function Login({ onAuthSuccess }) {
       }
     } catch (error) {
       console.error(error);
-      setErrorMsg(error.message || 'Login failed. Please double check credentials.');
+      setErrorMsg(friendlyAuthError(error));
     } finally {
       setLoading(false);
     }
@@ -74,10 +107,20 @@ export default function Login({ onAuthSuccess }) {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-gold)' }}>LOCAL SANDBOX MODE</div>
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                Supabase not connected. Login with: <strong>glomaint2025@gmail.com</strong> (Developer), 
-                <strong>bishwa@gloma.com</strong> (Admin) or <strong>devin@gloma.com</strong> (Employee) using <em>any password</em>.
+                Supabase not connected. Login with <strong>capcutproforeveryone@gmail.com</strong> (Developer),
+                <strong>admin@gloma.com</strong> (Admin) or <strong>devin@gloma.com</strong> (Editor), password <strong>password123</strong>.
               </div>
             </div>
+          </div>
+        )}
+
+        {backendDown && !isUsingMock && (
+          <div style={styles.errorAlert}>
+            <WifiOff size={18} color="var(--color-cancelled)" />
+            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-cancelled)' }}>
+              The Gloma database server is not responding, so nobody can sign in right now.
+              If your internet is fine, the Supabase project is probably paused or deleted. Please tell the Developer.
+            </span>
           </div>
         )}
 
@@ -139,20 +182,6 @@ export default function Login({ onAuthSuccess }) {
             </div>
           </div>
 
-          {isSignUp && (
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Default Role Request</label>
-              <select 
-                value={defaultRole} 
-                onChange={(e) => setDefaultRole(e.target.value)}
-                className="form-input"
-              >
-                <option value="Employee">Employee (Devin/Bishwa/Writer)</option>
-                <option value="Admin">Administrator</option>
-                <option value="Developer">Developer</option>
-              </select>
-            </div>
-          )}
 
           <button type="submit" disabled={loading} className="btn-primary" style={styles.submitBtn}>
             {loading ? (

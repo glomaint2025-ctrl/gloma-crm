@@ -262,6 +262,22 @@ Coordinator & Accountant; add a dedicated Company Finance tab for the same three
   confirmed a non-finance role (Editor) does not see the Company Finance nav item at all.
 * **Status**: ✅ Code done, committed, pushed. ⚠️ **Two SQL migrations not yet run** — see Next steps.
 
+### Problem 14 — Supabase project deleted/unreachable; login hardening (2026-10-01)
+
+* **Cause**: the original Supabase project was deleted, so the host in `.env` no longer resolved and nobody could log in. A new project was created from `supabase_full_schema_setup.sql` and the keys updated in `.env` + Vercel.
+* **Code fixes**: `Login.jsx` now shows a clear "database server is not responding" banner (`checkBackendReachable` in `supabaseClient.js`) and friendly auth errors; the Register form no longer lets anyone request Admin/Developer, and the signup trigger ignores any role in signup metadata (new accounts are always `Employee`); `App.jsx` no longer hangs on the loading screen when the backend is down and returns to Login when the session ends.
+* **Note**: the public CRM is `https://gloma-crm.vercel.app`. The Vercel project `gloma-website` is the separate marketing website.
+
+### Problem 15 — Clients, Invoices, employee planning, Payroll (2026-10-01)
+
+* **Clients** (`Clients.jsx`): address, contact person/number/email, website package; add, edit, activate/deactivate (all finance roles), delete (Admin/Developer); search and status filter.
+* **Invoices & Quotations tab** (`Invoices.jsx`, `InvoiceSheet.jsx`, `invoiceUtils.js`): Quotation / Advance Invoice / Final Invoice, registered or one-time client, line items, discount, optional VAT, advance deduction, amount in words, auto numbering (`QTN-2026-001`), status tracking, convert quotation to invoice, duplicate. Print/Save-as-PDF uses the browser print dialog with a print-only A4 copy (`.print-only-sheet` in `index.css`). Company and bank details live in `COMPANY_PROFILE` in `invoiceUtils.js`.
+* **Employee planning**: employees can add their own tasks (Task Board "Add My Task" and by clicking a day on the Content Calendar); `tasks.created_by` marks them. Calendar chips show the employee name and there is an employee filter. `MonthlyPlan.jsx` holds per-employee monthly targets (e.g. 10 posts for one page, 5 for another) with progress counted from scheduled/delivered calendar tasks. The EOD form now has a client dropdown.
+* **Finance tab** is now tabbed: Website payments (existing), Payroll, Attendance & leave, Expenses & receipts. Payroll and Attendance are visible to Developer, Admin and Coordinator & Accountant only (not Manager). Rules live at the top of `payrollUtils.js`: overtime = hours x 1.5 x (basic / 240) on every overtime minute (Sundays/holidays included); no-pay day = basic / 30; EPF/ETF/tax/advances are entered manually as additions/deductions. Receipts are stored in the private Supabase Storage bucket `finance-docs`.
+* **Time clock**: starts automatically at 08:30 Mon-Sat (not on holidays, not when marked away) the first time the employee opens the app that day; they can Stop/Start from the dashboard. Sessions left open on an earlier day are closed at that day's closing time and flagged `auto_closed`. Admin/Accountant can correct times in Attendance & leave.
+* **SQL to run, in order**: `supabase_phase1_clients_invoices_plans.sql`, then `supabase_phase2_payroll_finance.sql` (both idempotent; validated against a local Postgres including RLS checks).
+* **Open questions/assumptions to confirm**: annual/casual/sick entitlement is 14/7/7; overtime has no weekly/monthly cap in the code; employees cannot see their own payslip in the UI yet (the RLS policy already allows reading finalized ones).
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.
@@ -279,6 +295,7 @@ Cloud-session git operations on the mounted folder repeatedly leave `.git/*.lock
 
 ## 5. Next steps / open items
 
+0. **Run the two new SQL files** (Phase 1 then Phase 2, see Problem 15) in the Supabase SQL Editor, enter salaries under Finance -> Payroll, and confirm the assumptions listed there.
 1. **Run `supabase_rename_accountant_role.sql` and `supabase_add_payment_fields.sql`** in the Supabase SQL Editor — Problem 13 (Coordinator & Accountant role + Website payment tracking + Company Finance tab) is deployed in code but needs these to work on the live site.
 2. **Run `supabase_add_time_logs.sql` in the Supabase SQL Editor** — the time clock (Problem 11) is deployed in code but needs this table to store clock-in/out data on the live site.
 4. **Verify the 2026 Sri Lanka holiday list** (`SRI_LANKA_HOLIDAYS_2026` in `src/workHours.js`) against the official government gazette, especially the 5 moon-sighting-dependent dates — and remember to add a 2027 list before the year rolls over.

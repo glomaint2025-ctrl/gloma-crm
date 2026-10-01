@@ -81,7 +81,7 @@ export default function WorkHours({
   const t = localTranslations[lang] || localTranslations.en;
 
   const userRole = currentUserProfile?.role || 'Employee';
-  const canSeeAll = userRole === 'Developer' || userRole === 'Admin' || userRole === 'Manager';
+  const canSeeAll = ['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(userRole);
 
   const [filterEmployee, setFilterEmployee] = useState('');
   const [view, setView] = useState('history'); // 'history' | 'calendar'

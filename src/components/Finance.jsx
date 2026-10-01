@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { Wallet, TrendingUp, TrendingDown, CheckCircle2, XCircle, Filter, Pencil } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, CheckCircle2, XCircle, Filter, Pencil, Banknote, CalendarCheck, Receipt, Globe } from 'lucide-react';
+import Payroll from './Payroll';
+import Attendance from './Attendance';
+import Expenses from './Expenses';
 
 const localTranslations = {
   en: {
     title: "Company Finance",
-    subtitle: "Website project payments — revenue collected and outstanding.",
+    subtitle: "Website payments, payroll, attendance and company expenses.",
     noAccess: "Only Admin, Manager, Coordinator & Accountant, or Developer accounts can view company finances.",
     totalCollected: "Total Collected",
     totalOutstanding: "Total Outstanding",
@@ -85,14 +88,20 @@ const localTranslations = {
 export default function Finance({
   tasks = [],
   clients = [],
+  profiles = [],
+  timeLogs = [],
   currentUserProfile = {},
   onSaveTask,
+  onRefreshData,
   lang = 'en'
 }) {
   const t = localTranslations[lang] || localTranslations.en;
 
   const userRole = currentUserProfile?.role || 'Employee';
   const hasAccess = ['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(userRole);
+
+  const canSeePayroll = ['Developer', 'Admin', 'Coordinator & Accountant'].includes(userRole);
+  const [tab, setTab] = useState('website');
 
   const [filterClient, setFilterClient] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -155,6 +164,38 @@ export default function Finance({
         </h2>
         <p style={styles.pageSubtitle}>{t.subtitle}</p>
       </div>
+
+      <div style={styles.tabBar}>
+        {[
+          { key: 'website', label: 'Website payments', icon: Globe, show: true },
+          { key: 'payroll', label: 'Payroll', icon: Banknote, show: canSeePayroll },
+          { key: 'attendance', label: 'Attendance & leave', icon: CalendarCheck, show: canSeePayroll },
+          { key: 'expenses', label: 'Expenses & receipts', icon: Receipt, show: true }
+        ].filter(item => item.show).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            style={{
+              ...styles.tabBtn,
+              backgroundColor: tab === key ? 'var(--color-gold)' : 'transparent',
+              color: tab === key ? '#0A0F1D' : 'var(--color-text-primary)'
+            }}
+          >
+            <Icon size={14} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'payroll' && canSeePayroll && (
+        <Payroll profiles={profiles} timeLogs={timeLogs} currentUserProfile={currentUserProfile} />
+      )}
+      {tab === 'attendance' && canSeePayroll && (
+        <Attendance profiles={profiles} timeLogs={timeLogs} currentUserProfile={currentUserProfile} onRefreshData={onRefreshData} />
+      )}
+      {tab === 'expenses' && <Expenses currentUserProfile={currentUserProfile} />}
+
+      {tab === 'website' && (
+        <>
 
       <div style={styles.summaryRow}>
         <div className="glass-panel" style={styles.summaryCard}>
@@ -310,6 +351,8 @@ export default function Finance({
           </table>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }
@@ -327,6 +370,27 @@ const styles = {
     fontSize: 'var(--font-size-xl)',
     fontWeight: '800',
     color: 'var(--color-text-primary)'
+  },
+  tabBar: {
+    display: 'flex',
+    gap: '4px',
+    flexWrap: 'wrap',
+    padding: '4px',
+    alignSelf: 'flex-start',
+    backgroundColor: 'var(--bg-badge-dark)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-sm)'
+  },
+  tabBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '7px 14px',
+    border: 'none',
+    borderRadius: 'var(--radius-xs)',
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: 600,
+    cursor: 'pointer'
   },
   pageSubtitle: {
     color: 'var(--color-text-secondary)',

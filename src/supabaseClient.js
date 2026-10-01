@@ -11,6 +11,25 @@ const isRealSupabaseConfigured =
 
 export const isUsingMock = !isRealSupabaseConfigured;
 
+// True when the Supabase host answers at all (any HTTP status). False means the
+// project is paused/deleted, the URL is wrong, or the device is offline.
+export const checkBackendReachable = async () => {
+  if (isUsingMock) return true;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    await fetch(`${supabaseUrl}/auth/v1/health`, {
+      headers: { apikey: supabaseAnonKey },
+      signal: controller.signal
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 // Real Supabase Client
 const realClient = isRealSupabaseConfigured 
   ? createClient(supabaseUrl, supabaseAnonKey) 
@@ -228,7 +247,8 @@ const mockClient = {
       await delay(80);
       localStorage.removeItem('gloma_current_user');
       return { error: null };
-    }
+    },
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
   },
 
   from: (tableName) => {

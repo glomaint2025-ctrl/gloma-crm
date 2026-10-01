@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, isUsingMock } from './supabaseClient';
 import Login from './components/Login';
@@ -13,7 +13,8 @@ import ManageRoles from './components/ManageRoles';
 import SetupSettings from './components/SetupSettings';
 import WorkHours from './components/WorkHours';
 import Finance from './components/Finance';
-import { splitWorkedMinutes, isHoliday, todayStr } from './workHours';
+import Invoices from './components/Invoices';
+import { splitWorkedMinutes, isHoliday, getClosingTime, todayStr, OFFICE_OPEN_TIME } from './workHours';
 
 import {
   LayoutDashboard,
@@ -31,7 +32,8 @@ import {
   Menu,
   X,
   Clock,
-  Wallet
+  Wallet,
+  FileText
 } from 'lucide-react';
 
 const sidebarTranslations = {
@@ -44,6 +46,7 @@ const sidebarTranslations = {
     deliveries: "Final Deliveries",
     workHours: "Work Hours",
     finance: "Company Finance",
+    invoices: "Invoices & Quotations",
     team: "Team Members",
     roles: "Manage Roles",
     settings: "System Settings",
@@ -59,6 +62,7 @@ const sidebarTranslations = {
     deliveries: "භාරදීම්",
     workHours: "වැඩ කරන වේලාවන්",
     finance: "සමාගමේ ගිණුම්කරණය",
+    invoices: "ඉන්වොයිස් සහ මිල ගණන්",
     team: "කණ්ඩායම් සාමාජිකයින්",
     roles: "අවසර කළමනාකරණය",
     settings: "පද්ධති සැකසුම්",
@@ -74,6 +78,7 @@ const sidebarTranslations = {
     deliveries: "இறுதி வழங்கல்கள்",
     workHours: "பணி நேரங்கள்",
     finance: "நிறுவன நிதி",
+    invoices: "விலைப்பட்டியல்கள்",
     team: "குழு உறுப்பினர்கள்",
     roles: "பாத்திர நிர்வாகம்",
     settings: "அமைப்புகள்",
@@ -108,6 +113,9 @@ export default function App() {
   const [dailyUpdates, setDailyUpdates] = useState([]);
   const [deliveredWork, setDeliveredWork] = useState([]);
   const [timeLogs, setTimeLogs] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [invoicesError, setInvoicesError] = useState('');
+  const [monthlyPlans, setMonthlyPlans] = useState([]);
   
   const [globalSettings, setGlobalSettings] = useState({
     language: 'en',
@@ -124,15 +132,32 @@ export default function App() {
   // Authenticate and load session
   useEffect(() => {
     const initAuth = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setSessionUser(data.user);
-        await loadUserProfile(data.user.id, data.user.email);
-      } else {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user) {
+          setSessionUser(data.user);
+          await loadUserProfile(data.user.id, data.user.email);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        // Backend unreachable: fall through to the login screen instead of an endless spinner.
+        console.error('Auth initialisation failed:', err);
         setLoading(false);
       }
     };
     initAuth();
+
+    // Session ended elsewhere (signed out in another tab, refresh token expired/revoked):
+    // return to the login screen instead of leaving a dead, half-working dashboard.
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setSessionUser(null);
+        setCurrentUserProfile(null);
+        setActiveView('dashboard');
+      }
+    });
+    return () => authListener?.subscription?.unsubscribe();
   }, []);
 
   // Presence heartbeat: keep this user's last_seen fresh while the app is open
@@ -155,6 +180,72 @@ export default function App() {
     const interval = setInterval(beat, 60000);
     return () => clearInterval(interval);
   }, [currentUserProfile?.id]);
+
+  // Time clock housekeeping, once per day per user:
+  //  1. close sessions left open on earlier days (at that day's closing time), and
+  //  2. start today's session automatically at 08:30 on working days (Mon-Sat) unless
+  //     the day is a holiday, the employee already has a session, or they are marked away.
+  // The employee can still Stop and Start again from the dashboard clock.
+  const timeLogsRef = useRef(timeLogs);
+  timeLogsRef.current = timeLogs;
+  const clockSyncedDayRef = useRef('');
+
+  useEffect(() => {
+    if (loading || !currentUserProfile?.id || currentUserProfile.role === 'Developer') return;
+
+    const userId = currentUserProfile.id;
+    const localISO = (dateStr, hhmm) => new Date(`${dateStr}T${hhmm}:00`).toISOString();
+
+    const syncClock = async () => {
+      const today = todayStr();
+      if (clockSyncedDayRef.current === today) return;
+      if (new Date() < new Date(`${today}T${OFFICE_OPEN_TIME}:00`)) return; // wait for 08:30
+      clockSyncedDayRef.current = today;
+
+      try {
+        const myLogs = timeLogsRef.current.filter(l => l.user_id === userId);
+
+        for (const log of myLogs.filter(l => !l.clock_out && l.work_date < today)) {
+          const clockIn = new Date(log.clock_in);
+          let closeAt = new Date(localISO(log.work_date, getClosingTime(log.work_date) || '17:00'));
+          if (closeAt < clockIn) closeAt = clockIn;
+          const split = splitWorkedMinutes(log.clock_in, closeAt.toISOString(), log.work_date);
+          await supabase.from('time_logs').update({
+            clock_out: closeAt.toISOString(),
+            regular_minutes: split.regularMinutes,
+            overtime_minutes: split.overtimeMinutes,
+            is_holiday: isHoliday(log.work_date),
+            auto_closed: true
+          }).eq('id', log.id);
+        }
+
+        const hasSessionToday = myLogs.some(l => l.work_date === today);
+        if (!hasSessionToday && !isHoliday(today)) {
+          const { data: markRows } = await supabase.from('attendance_marks').select('*').eq('employee_id', userId);
+          const markedAway = (markRows || []).some(m =>
+            String(m.work_date).substring(0, 10) === today && m.status !== 'Present'
+          );
+          if (!markedAway) {
+            await supabase.from('time_logs').insert({
+              user_id: userId,
+              employee_name: currentUserProfile.full_name,
+              work_date: today,
+              clock_in: localISO(today, OFFICE_OPEN_TIME),
+              clock_out: null,
+              source: 'auto'
+            });
+          }
+        }
+        await refreshData();
+      } catch (err) {
+        console.error('Time clock sync failed:', err);
+      }
+    };
+
+    syncClock();
+    const interval = setInterval(syncClock, 60000);
+    return () => clearInterval(interval);
+  }, [loading, currentUserProfile?.id]);
 
   const applyVisualSettings = (settings) => {
     if (!settings) return;
@@ -249,6 +340,15 @@ export default function App() {
       const { data: qTimeLogs } = await supabase.from('time_logs').select('*');
       const sortedTimeLogs = (qTimeLogs || []).sort((a, b) => (b.clock_in || '').localeCompare(a.clock_in || ''));
       setTimeLogs(sortedTimeLogs);
+
+      // 7. Billing documents (finance roles only; RLS returns nothing for everyone else)
+      const { data: qInvoices, error: invoicesErr } = await supabase.from('invoices').select('*');
+      setInvoices(qInvoices || []);
+      setInvoicesError(invoicesErr ? invoicesErr.message : '');
+
+      // 8. Monthly content plans
+      const { data: qPlans } = await supabase.from('monthly_plans').select('*');
+      setMonthlyPlans(qPlans || []);
     } catch (err) {
       console.error('Error fetching tables data:', err);
     }
@@ -410,23 +510,81 @@ export default function App() {
   const handleSaveClient = async (clientObj) => {
     try {
       const existing = clientObj.id && clients.some(c => c.id === clientObj.id);
-      if (existing) {
-        await supabase.from('clients').update(clientObj).eq('id', clientObj.id);
-      } else {
-        await supabase.from('clients').insert(clientObj);
-      }
+      const { error } = existing
+        ? await supabase.from('clients').update(clientObj).eq('id', clientObj.id)
+        : await supabase.from('clients').insert(clientObj);
+      if (error) throw error;
       await refreshData();
+      return { success: true };
     } catch (err) {
-      console.error("Error saving client:", err);
+      console.error('Error saving client:', err);
+      return { success: false, error: err.message };
     }
   };
 
   const handleDeleteClient = async (clientId) => {
     try {
-      await supabase.from('clients').delete().eq('id', clientId);
+      const { error } = await supabase.from('clients').delete().eq('id', clientId);
+      if (error) throw error;
       await refreshData();
+      return { success: true };
     } catch (err) {
-      console.error("Error deleting client:", err);
+      console.error('Error deleting client:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleSaveInvoice = async (docObj) => {
+    try {
+      const existing = docObj.id && invoices.some(d => d.id === docObj.id);
+      const { error } = existing
+        ? await supabase.from('invoices').update(docObj).eq('id', docObj.id)
+        : await supabase.from('invoices').insert(docObj);
+      if (error) throw error;
+      await refreshData();
+      return { success: true };
+    } catch (err) {
+      console.error('Error saving invoice:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleDeleteInvoice = async (docId) => {
+    try {
+      const { error } = await supabase.from('invoices').delete().eq('id', docId);
+      if (error) throw error;
+      await refreshData();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting invoice:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleSavePlan = async (planObj) => {
+    try {
+      const existing = planObj.id && monthlyPlans.some(p => p.id === planObj.id);
+      const { error } = existing
+        ? await supabase.from('monthly_plans').update(planObj).eq('id', planObj.id)
+        : await supabase.from('monthly_plans').insert(planObj);
+      if (error) throw error;
+      await refreshData();
+      return { success: true };
+    } catch (err) {
+      console.error('Error saving monthly plan:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleDeletePlan = async (planId) => {
+    try {
+      const { error } = await supabase.from('monthly_plans').delete().eq('id', planId);
+      if (error) throw error;
+      await refreshData();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting monthly plan:', err);
+      return { success: false, error: err.message };
     }
   };
 
@@ -718,6 +876,16 @@ export default function App() {
             </button>
           )}
 
+          {/* Invoices & Quotations: same finance roles as Company Finance */}
+          {['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(currentUserProfile?.role) && (
+            <button
+              onClick={() => navTo('invoices')}
+              className={`nav-btn ${activeView === 'invoices' ? 'active' : ''}`}
+            >
+              <FileText size={18} /> {sbT.invoices}
+            </button>
+          )}
+
           {/* Team directory: visible to ALL team members */}
           <button
             onClick={() => navTo('team')}
@@ -821,7 +989,10 @@ export default function App() {
             profiles={profiles}
             currentUserProfile={currentUserProfile}
             lang={lang}
+            monthlyPlans={monthlyPlans}
             onSaveTask={handleSaveTask}
+            onSavePlan={handleSavePlan}
+            onDeletePlan={handleDeletePlan}
           />
         )}
 
@@ -829,6 +1000,7 @@ export default function App() {
           <DailyUpdates 
             updates={dailyUpdates} 
             tasks={tasks} 
+            clients={clients}
             profiles={profiles} 
             currentUserProfile={currentUserProfile}
             onSaveUpdate={handleSaveUpdate}
@@ -862,9 +1034,23 @@ export default function App() {
           <Finance
             tasks={tasks}
             clients={clients}
+            profiles={profiles}
+            timeLogs={timeLogs}
             currentUserProfile={currentUserProfile}
             onSaveTask={handleSaveTask}
+            onRefreshData={refreshData}
             lang={lang}
+          />
+        )}
+
+        {activeView === 'invoices' && (
+          <Invoices
+            invoices={invoices}
+            clients={clients}
+            currentUserProfile={currentUserProfile}
+            loadError={invoicesError}
+            onSaveInvoice={handleSaveInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
           />
         )}
 

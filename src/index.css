@@ -620,3 +620,18 @@ body.light-theme .nav-btn.active {
   background: rgba(212, 175, 55, 0.14) !important;
   color: #92751a !important; /* Premium dark gold for light mode text accessibility compliance */
 }
+
+/* ===== Invoice / quotation generator ===== */
+.print-only-sheet { display: none; }
+
+@media (max-width: 1000px) {
+  .invoice-editor-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .invoice-editor-grid > div:last-child { position: static !important; }
+}
+
+@media print {
+  @page { size: A4; margin: 0; }
+  html, body { background: #ffffff !important; }
+  #root { display: none !important; }
+  .print-only-sheet { display: block !important; }
+}

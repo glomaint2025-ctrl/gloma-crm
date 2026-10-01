@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Filter, Calendar as CalIcon, Plus } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { sendTaskAssignedEmail } from '../emailService';
+import MonthlyPlan from './MonthlyPlan';
 
 const localTranslations = {
   en: {
     title: "Content Calendar Feed",
     filterClient: "All Clients",
     filterType: "All Content Types",
+    filterEmployee: "All Employees",
+    selfAssigned: "This will be added to your own work:",
     quickAdd: "Quick Add Assignment",
     prefilledDate: "Pre-filled Date:",
     save: "Create Task",
@@ -24,6 +27,8 @@ const localTranslations = {
     title: "අන්තර්ගත දින දර්ශනය",
     filterClient: "සියලුම සේවාදායකයින්",
     filterType: "සියලුම වර්ගයන්",
+    filterEmployee: "සියලුම සේවකයින්",
+    selfAssigned: "මෙය ඔබේම කාර්යයක් ලෙස එක් වේ:",
     quickAdd: "කෙටි ක්‍රමයකින් එක් කරන්න",
     prefilledDate: "තෝරාගත් දිනය:",
     save: "සුරකින්න",
@@ -40,6 +45,8 @@ const localTranslations = {
     title: "உள்ளடக்க காலெண்டர்",
     filterClient: "அனைத்து வாடிக்கையாளர்கள்",
     filterType: "அனைத்து வகைகள்",
+    filterEmployee: "அனைத்து ஊழியர்கள்",
+    selfAssigned: "இது உங்கள் சொந்த பணியாகச் சேர்க்கப்படும்:",
     quickAdd: "விரைவாகச் சேர்க்கவும்",
     prefilledDate: "தேர்ந்தெடுக்கப்பட்ட தேதி:",
     save: "பணியை உருவாக்கு",
@@ -60,13 +67,17 @@ export default function ContentCalendar({
   profiles = [],
   currentUserProfile = {},
   lang = 'en',
-  onSaveTask
+  monthlyPlans = [],
+  onSaveTask,
+  onSavePlan,
+  onDeletePlan
 }) {
   const t = localTranslations[lang] || localTranslations.en;
   
   // Filters
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedType, setSelectedType] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState('');
   
   // Date states
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -81,7 +92,7 @@ export default function ContentCalendar({
   const [priority, setPriority] = useState('Normal');
 
   const userRole = currentUserProfile?.role || 'Employee';
-  const hasAssignPrivilege = userRole === 'Developer' || userRole === 'Admin';
+  const hasAssignPrivilege = ['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(userRole);
 
   // Calendar calculations
   const year = currentDate.getFullYear();
@@ -104,7 +115,8 @@ export default function ContentCalendar({
   const calendarTasks = tasks.filter(task => {
     const matchesClient = !selectedClient || task.client_id === selectedClient || task.client_project === selectedClient;
     const matchesType = !selectedType || task.work_type === selectedType;
-    return matchesClient && matchesType;
+    const matchesEmployee = !selectedEmployee || task.employee_id === selectedEmployee;
+    return matchesClient && matchesType && matchesEmployee;
   });
 
   const getTasksForDay = (dayNum) => {
@@ -116,7 +128,6 @@ export default function ContentCalendar({
   };
 
   const handleDayClick = (dayNum) => {
-    if (!hasAssignPrivilege) return;
     const pad = (n) => String(n).padStart(2, '0');
     const formattedDate = `${year}-${pad(month + 1)}-${pad(dayNum)}`;
     setSelectedCalendarDate(formattedDate);
@@ -125,7 +136,8 @@ export default function ContentCalendar({
     setClientProject(selectedClient ? (clients.find(c => c.id === selectedClient)?.name || '') : '');
     setWorkType(selectedType || 'Post');
     setTaskDetail('');
-    setAssignedEmployee('');
+    // Employees schedule work for themselves; privileged roles pick the assignee.
+    setAssignedEmployee(hasAssignPrivilege ? '' : currentUserProfile.id);
     setPriority('Normal');
     setIsModalOpen(true);
   };
@@ -139,7 +151,8 @@ export default function ContentCalendar({
 
     let selectedEmpId = null;
     let selectedEmpName = '';
-    const foundProfile = profiles.find(p => p.id === assignedEmployee);
+    const effectiveAssignee = hasAssignPrivilege ? assignedEmployee : currentUserProfile.id;
+    const foundProfile = profiles.find(p => p.id === effectiveAssignee);
     if (foundProfile) {
       selectedEmpId = foundProfile.id;
       selectedEmpName = foundProfile.full_name;
@@ -165,10 +178,13 @@ export default function ContentCalendar({
       work_type: workType,
       title: taskDetail,
       priority: priority,
-      status: 'Pending Approval',
+      status: hasAssignPrivilege ? 'Pending Approval' : 'In Progress',
       progress: 0.0,
       last_updated: new Date().toISOString()
     };
+    if (!hasAssignPrivilege) {
+      newTask.created_by = currentUserProfile.id;
+    }
 
     const result = await onSaveTask(newTask);
     if (result && result.success === false) {
@@ -179,7 +195,7 @@ export default function ContentCalendar({
 
     // Same assignment notification + email as the Task Board's "New Task" flow.
     // Only after the task itself actually saved.
-    if (selectedEmpId) {
+    if (selectedEmpId && selectedEmpId !== currentUserProfile?.id) {
       try {
         await supabase.from('notifications').insert({
           user_id: selectedEmpId,
@@ -263,6 +279,9 @@ export default function ContentCalendar({
             >
               <div style={styles.taskTagText}>
                 <strong>{task.work_type}:</strong> {task.title}
+                {task.employee_name && task.employee_name !== 'Unassigned' && (
+                  <span style={{ opacity: 0.8 }}> - {task.employee_name.split(' ')[0]}</span>
+                )}
               </div>
             </div>
           ))}
@@ -299,6 +318,20 @@ export default function ContentCalendar({
             </select>
           </div>
 
+          {/* Employee Filter */}
+          <div style={styles.filterItem}>
+            <select
+              value={selectedEmployee}
+              onChange={(e) => setSelectedEmployee(e.target.value)}
+              style={styles.selectFilter}
+            >
+              <option value="">{t.filterEmployee}</option>
+              {profiles.map(p => (
+                <option key={p.id} value={p.id}>{p.full_name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Type Filter */}
           <div style={styles.filterItem}>
             <select
@@ -329,6 +362,19 @@ export default function ContentCalendar({
 
         </div>
       </div>
+
+      <MonthlyPlan
+        monthKey={`${year}-${String(month + 1).padStart(2, '0')}`}
+        monthLabel={`${monthNames[month]} ${year}`}
+        plans={monthlyPlans}
+        tasks={tasks}
+        clients={clients}
+        profiles={profiles}
+        currentUserProfile={currentUserProfile}
+        filterEmployeeId={selectedEmployee}
+        onSavePlan={onSavePlan}
+        onDeletePlan={onDeletePlan}
+      />
 
       {/* Week Header + Calendar Grid (horizontally scrollable on narrow screens) */}
       <div style={{ overflowX: 'auto' }}>
@@ -404,19 +450,25 @@ export default function ContentCalendar({
                 </div>
               </div>
 
-              <div>
-                <label style={styles.label}>{t.employee}</label>
-                <select
-                  value={assignedEmployee}
-                  onChange={(e) => setAssignedEmployee(e.target.value)}
-                  className="form-input"
-                >
-                  <option value="">Unassigned Teammate</option>
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
-                  ))}
-                </select>
-              </div>
+              {hasAssignPrivilege ? (
+                <div>
+                  <label style={styles.label}>{t.employee}</label>
+                  <select
+                    value={assignedEmployee}
+                    onChange={(e) => setAssignedEmployee(e.target.value)}
+                    className="form-input"
+                  >
+                    <option value="">Unassigned Teammate</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div style={styles.formDateNotice}>
+                  <span>{t.selfAssigned} <strong>{currentUserProfile.full_name}</strong></span>
+                </div>
+              )}
 
               <div>
                 <label style={styles.label}>{t.taskDetail}</label>

@@ -4,6 +4,7 @@ import { Calendar, User, BookOpen, Clock, FileText, Send, Trash2, ShieldAlert } 
 export default function DailyUpdates({ 
   updates = [], 
   tasks = [], 
+  clients = [],
   profiles = [], 
   currentUserProfile = {}, 
   onSaveUpdate, 
@@ -35,6 +36,16 @@ export default function DailyUpdates({
     if (isAdminOrDev) return true;
     return t.employee_id === currentUserProfile.id || t.employee_name === currentUserProfile.full_name;
   });
+
+  // Registered active clients, plus the internal bucket and any client name already
+  // on the selected task (e.g. a client that was later deactivated).
+  const clientOptions = [
+    ...clients.filter(c => c.status === 'Active').map(c => c.name),
+    'Gloma General'
+  ];
+  if (clientProject && !clientOptions.includes(clientProject)) {
+    clientOptions.push(clientProject);
+  }
 
   const handleTaskChange = (selectedTaskId) => {
     setTaskId(selectedTaskId);
@@ -159,13 +170,16 @@ export default function DailyUpdates({
 
               <div style={{ flex: 1 }}>
                 <label style={styles.formLabel}>Client / Project</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Dimbula Tea"
+                <select
                   value={clientProject}
                   onChange={(e) => setClientProject(e.target.value)}
                   className="form-input"
-                />
+                >
+                  <option value="">Select client...</option>
+                  {clientOptions.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
