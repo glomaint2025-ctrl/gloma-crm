@@ -10,7 +10,6 @@ const APP_ID = 'lk.gloma.crm';
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
-let manualUpdateCheck = false;
 
 // The CRM itself is the live website, so every Vercel deploy reaches the desktop
 // app automatically; this shell only adds the window, tray, startup and reminders.
@@ -93,60 +92,83 @@ function createWindow() {
 
 // The CRM website updates itself on every deploy. This updates the desktop shell
 // (tray, icon, startup, reminders) from the newest GitHub Release of the repo.
-function setupAutoUpdate() {
-  if (!app.isPackaged) return;
+function sendUpdateStatus(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('gloma:update-status', payload);
+  }
+}
 
+function setupAutoUpdate() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on('update-downloaded', (info) => {
-    manualUpdateCheck = false;
-    dialog.showMessageBox({
-      type: 'info',
-      buttons: ['Restart now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'Gloma CRM update',
-      message: `Version ${info.version} is ready to install.`,
-      detail: 'Restart to finish updating. It will also install automatically the next time the app quits.'
-    }).then((result) => {
-      if (result.response === 0) {
-        isQuitting = true;
-        autoUpdater.quitAndInstall();
-      }
-    });
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdateStatus({ state: 'downloading', percent: Math.round(progress.percent) });
   });
 
-  autoUpdater.on('update-not-available', () => {
-    if (manualUpdateCheck) {
-      manualUpdateCheck = false;
-      dialog.showMessageBox({ type: 'info', message: 'Gloma CRM is up to date.', detail: `Version ${app.getVersion()}` });
+  autoUpdater.on('update-downloaded', (info) => {
+    sendUpdateStatus({ state: 'downloaded', version: info.version });
+    // If nobody is looking at the window, ask with a system dialog instead.
+    if (!mainWindow || !mainWindow.isVisible()) {
+      dialog.showMessageBox({
+        type: 'info',
+        buttons: ['Restart now', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        title: 'Gloma CRM update',
+        message: `Version ${info.version} is ready to install.`,
+        detail: 'Restart to finish updating. It will also install automatically the next time the app quits.'
+      }).then((result) => {
+        if (result.response === 0) installUpdateNow();
+      });
     }
   });
 
   autoUpdater.on('error', (err) => {
     console.error('Auto-update error:', err && err.message);
-    if (manualUpdateCheck) {
-      manualUpdateCheck = false;
-      dialog.showMessageBox({ type: 'warning', message: 'Could not check for updates.', detail: 'Check your internet connection and try again.' });
-    }
+    sendUpdateStatus({ state: 'error', message: err && err.message });
   });
 
-  const check = () => autoUpdater.checkForUpdates().catch((err) => {
-    console.error('Update check failed:', err && err.message);
-  });
+  ipcMain.handle('gloma:get-version', () => app.getVersion());
+  ipcMain.on('gloma:install-update', () => installUpdateNow());
+  ipcMain.handle('gloma:check-updates', () => runUpdateCheck());
 
-  check();
-  setInterval(check, 4 * 60 * 60 * 1000);
+  if (!app.isPackaged) return;
+  runUpdateCheck();
+  setInterval(runUpdateCheck, 4 * 60 * 60 * 1000);
 }
 
-function checkForUpdatesNow() {
+function installUpdateNow() {
+  isQuitting = true;
+  autoUpdater.quitAndInstall();
+}
+
+// Resolves with { state: 'up-to-date' | 'downloading' | 'error', version?, message? }.
+async function runUpdateCheck() {
   if (!app.isPackaged) {
-    dialog.showMessageBox({ type: 'info', message: 'Updates are only checked in the installed app.' });
-    return;
+    return { state: 'error', message: 'Updates are only checked in the installed app.' };
   }
-  manualUpdateCheck = true;
-  autoUpdater.checkForUpdates().catch(() => {});
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    if (result && result.isUpdateAvailable) {
+      return { state: 'downloading', version: result.updateInfo.version };
+    }
+    return { state: 'up-to-date', version: app.getVersion() };
+  } catch (err) {
+    console.error('Update check failed:', err && err.message);
+    return { state: 'error', message: 'Could not check for updates. Check your internet connection.' };
+  }
+}
+
+async function checkForUpdatesFromTray() {
+  const result = await runUpdateCheck();
+  if (result.state === 'up-to-date') {
+    dialog.showMessageBox({ type: 'info', message: 'Gloma CRM is up to date.', detail: `Version ${app.getVersion()}` });
+  } else if (result.state === 'downloading') {
+    dialog.showMessageBox({ type: 'info', message: `Downloading version ${result.version}...`, detail: 'You will be asked to restart when it is ready.' });
+  } else {
+    dialog.showMessageBox({ type: 'warning', message: 'Could not check for updates.', detail: result.message || '' });
+  }
 }
 
 function startsWithWindows() {
@@ -164,7 +186,7 @@ function buildTrayMenu() {
         app.setLoginItemSettings({ openAtLogin: item.checked, args: ['--hidden'] });
       }
     },
-    { label: `Check for updates (v${app.getVersion()})`, click: () => checkForUpdatesNow() },
+    { label: `Check for updates (v${app.getVersion()})`, click: () => checkForUpdatesFromTray() },
     { type: 'separator' },
     {
       label: 'Quit',

@@ -16,6 +16,7 @@ import Finance from './components/Finance';
 import Invoices from './components/Invoices';
 import ClockReminder from './components/ClockReminder';
 import UpdateBanner from './components/UpdateBanner';
+import DesktopUpdate from './components/DesktopUpdate';
 import { splitWorkedMinutes, isHoliday, getClosingTime, todayStr, OFFICE_OPEN_TIME } from './workHours';
 
 import {
@@ -227,8 +228,12 @@ export default function App() {
           }).eq('id', log.id);
         }
 
+        // Starting at 08:30 only makes sense during office hours; opening the app after
+        // closing time must not backdate a full day of overtime.
+        const closing = getClosingTime(today);
+        const beforeClosing = !!closing && new Date() < new Date(`${today}T${closing}:00`);
         const hasSessionToday = myLogs.some(l => l.work_date === today);
-        if (!hasSessionToday && !isHoliday(today)) {
+        if (!hasSessionToday && !isHoliday(today) && beforeClosing) {
           const { data: markRows } = await supabase.from('attendance_marks').select('*').eq('employee_id', userId);
           const markedAway = (markRows || []).some(m =>
             String(m.work_date).substring(0, 10) === today && m.status !== 'Present'
@@ -927,6 +932,7 @@ export default function App() {
 
         {/* User profile footer */}
         <div style={styles.sidebarFooter}>
+          <DesktopUpdate />
           <div style={styles.profileBadge}>
             <div style={styles.avatarMiniOuter}>
               <img 
