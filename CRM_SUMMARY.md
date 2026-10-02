@@ -306,6 +306,7 @@ Coordinator & Accountant; add a dedicated Company Finance tab for the same three
 
 ### Problem 19 — Direct PDF download (2026-10-02)
 
+* Sheets use a border-based design (no dark fills). The PDF exporter paginates properly: a document that fits stays on one A4 page with the footer at the bottom; longer ones break only between rows/blocks, repeat the table header, and carry the footer and "Page x of y" on every page (sheets mark their parts with `data-pdf-*` attributes).
 * Invoices, quotations and payslips have a **Download PDF** button (`PdfDownload.jsx`, `pdfExport.js`: html2canvas + jsPDF, loaded on demand) next to Print; "Print all payslips" downloads one multi-page PDF. The PDF is an image of the A4 sheet, so its text cannot be selected or copied; use Print for a text PDF.
 
 ## 4. Git status (as of end of this session)

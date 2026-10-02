@@ -9,13 +9,16 @@ import {
   formatLongDate
 } from '../invoiceUtils';
 
-// Print-ready A4 layout for quotations and invoices. Uses fixed colours (not the
-// app theme variables) so the printed/PDF output looks the same in light and dark mode.
+// Print-ready A4 layout for quotations and invoices. Border-based design (no dark fills)
+// with fixed colours so the printed/PDF output looks the same in light and dark mode.
+// The data-pdf-* attributes tell the PDF exporter where the header, footer and safe page
+// breaks are; see src/pdfExport.js.
 const COLORS = {
   navy: '#0F1729',
   gold: '#C9A877',
   goldSoft: '#F5EFE3',
-  border: '#D5DEE9',
+  border: '#C9D3DF',
+  head: '#EEF2F7',
   label: '#4A5568',
   text: '#111827',
   muted: '#52606D',
@@ -33,23 +36,26 @@ export default function InvoiceSheet({ doc }) {
   const bank = COMPANY_PROFILE.bank;
   const hasAdvanceRow = totals.advance > 0;
   const showBreakdown = totals.discountAmount > 0 || totals.taxAmount > 0 || hasAdvanceRow;
+  const spanCols = showQtyColumns ? 3 : 1;
 
   return (
     <div className="invoice-sheet" style={s.sheet}>
-      <div style={s.header}>
-        <div style={s.logoBox}>
-          <img src="/logo.png" alt="Gloma" style={s.logo} />
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={s.heading}>{typeConfig.heading}</div>
-          {doc.service_title && <div style={s.headerSub}>{doc.service_title}</div>}
-          <div style={s.headerNumber}>{doc.doc_number}</div>
-        </div>
-      </div>
-      <div style={s.goldBar} />
+      <div data-pdf-frame="true" style={s.frame} />
 
-      <div style={s.body}>
-        <div style={s.metaTable}>
+      <div data-pdf-header="true">
+        <div style={s.header}>
+          <img src="/logo.png" alt="Gloma" style={s.logo} />
+          <div style={{ textAlign: 'right' }}>
+            <div style={s.heading}>{typeConfig.heading}</div>
+            {doc.service_title && <div style={s.headerSub}>{doc.service_title}</div>}
+            <div style={s.headerNumber}>{doc.doc_number}</div>
+          </div>
+        </div>
+        <div style={s.rule} />
+      </div>
+
+      <div data-pdf-body="true" style={s.body}>
+        <div data-pdf-block="true" style={s.metaTable}>
           <div style={s.metaCell}>
             <div style={s.metaLabel}>{typeConfig.numberLabel}</div>
             <div>{doc.doc_number}</div>
@@ -72,7 +78,7 @@ export default function InvoiceSheet({ doc }) {
           )}
         </div>
 
-        <div style={s.partiesRow}>
+        <div data-pdf-block="true" style={s.partiesRow}>
           <div style={s.partyCol}>
             <div style={s.partyHeader}>ISSUED BY</div>
             <div style={s.partyBody}>
@@ -94,10 +100,10 @@ export default function InvoiceSheet({ doc }) {
           </div>
         </div>
 
-        <div style={s.sectionTitle}>PRICING &amp; PACKAGE STRUCTURE</div>
+        <div data-pdf-keep="true" style={s.sectionTitle}>PRICING &amp; PACKAGE STRUCTURE</div>
         <table style={s.itemsTable}>
           <thead>
-            <tr>
+            <tr data-pdf-keep="true">
               <th style={{ ...s.th, textAlign: 'center' }}>DESCRIPTION</th>
               {showQtyColumns && <th style={{ ...s.th, width: '60px' }}>QTY</th>}
               {showQtyColumns && <th style={{ ...s.th, width: '110px' }}>UNIT PRICE</th>}
@@ -121,56 +127,48 @@ export default function InvoiceSheet({ doc }) {
 
             {showBreakdown && (
               <tr>
-                <td style={{ ...s.td, textAlign: 'right' }} colSpan={showQtyColumns ? 3 : 1}>Subtotal</td>
+                <td style={{ ...s.td, textAlign: 'right' }} colSpan={spanCols}>Subtotal</td>
                 <td style={{ ...s.td, textAlign: 'center' }}>{formatMoney(totals.subtotal)}</td>
               </tr>
             )}
             {totals.discountAmount > 0 && (
               <tr>
-                <td style={{ ...s.td, textAlign: 'right' }} colSpan={showQtyColumns ? 3 : 1}>Discount</td>
+                <td style={{ ...s.td, textAlign: 'right' }} colSpan={spanCols}>Discount</td>
                 <td style={{ ...s.td, textAlign: 'center' }}>- {formatMoney(totals.discountAmount)}</td>
               </tr>
             )}
             {totals.taxAmount > 0 && (
               <tr>
-                <td style={{ ...s.td, textAlign: 'right' }} colSpan={showQtyColumns ? 3 : 1}>VAT ({Number(doc.tax_rate)}%)</td>
+                <td style={{ ...s.td, textAlign: 'right' }} colSpan={spanCols}>VAT ({Number(doc.tax_rate)}%)</td>
                 <td style={{ ...s.td, textAlign: 'center' }}>{formatMoney(totals.taxAmount)}</td>
               </tr>
             )}
 
             <tr style={{ backgroundColor: COLORS.goldSoft }}>
-              <td style={{ ...s.td, fontWeight: 700, borderBottom: `1.5px solid ${COLORS.navy}` }} colSpan={showQtyColumns ? 3 : 1}>
-                {typeConfig.totalLabel}
-              </td>
-              <td style={{ ...s.td, textAlign: 'center', fontWeight: 700, borderBottom: `1.5px solid ${COLORS.navy}` }}>
-                {formatMoney(totals.total)}
-              </td>
+              <td style={{ ...s.td, ...s.totalCell }} colSpan={spanCols}>{typeConfig.totalLabel}</td>
+              <td style={{ ...s.td, ...s.totalCell, textAlign: 'center' }}>{formatMoney(totals.total)}</td>
             </tr>
 
             {hasAdvanceRow && (
               <>
                 <tr>
-                  <td style={{ ...s.td, textAlign: 'right' }} colSpan={showQtyColumns ? 3 : 1}>Less: Advance received</td>
+                  <td style={{ ...s.td, textAlign: 'right' }} colSpan={spanCols}>Less: Advance received</td>
                   <td style={{ ...s.td, textAlign: 'center' }}>- {formatMoney(totals.advance)}</td>
                 </tr>
                 <tr style={{ backgroundColor: COLORS.goldSoft }}>
-                  <td style={{ ...s.td, fontWeight: 700, borderBottom: `1.5px solid ${COLORS.navy}` }} colSpan={showQtyColumns ? 3 : 1}>
-                    Balance Due
-                  </td>
-                  <td style={{ ...s.td, textAlign: 'center', fontWeight: 700, borderBottom: `1.5px solid ${COLORS.navy}` }}>
-                    {formatMoney(totals.balance)}
-                  </td>
+                  <td style={{ ...s.td, ...s.totalCell }} colSpan={spanCols}>Balance Due</td>
+                  <td style={{ ...s.td, ...s.totalCell, textAlign: 'center' }}>{formatMoney(totals.balance)}</td>
                 </tr>
               </>
             )}
           </tbody>
         </table>
 
-        <div style={s.wordsBox}>
+        <div data-pdf-block="true" style={s.wordsBox}>
           Amount in Words: {amountInWords(hasAdvanceRow ? totals.balance : totals.total)}
         </div>
 
-        <div style={s.sectionTitle}>PAYMENT METHOD &amp; BANK DETAILS</div>
+        <div data-pdf-keep="true" style={s.sectionTitle}>PAYMENT METHOD &amp; BANK DETAILS</div>
         <table style={s.bankTable}>
           <tbody>
             {[
@@ -189,12 +187,12 @@ export default function InvoiceSheet({ doc }) {
         </table>
 
         {doc.notes && (
-          <div style={s.noteBox}>
+          <div data-pdf-block="true" style={s.noteBox}>
             {doc.notes.split('\n').map((line, i) => <div key={i}>{line}</div>)}
           </div>
         )}
 
-        <div style={s.signRow}>
+        <div data-pdf-block="true" style={s.signRow}>
           <div style={s.signCol}>
             <div>Authorized By</div>
             <div>{COMPANY_PROFILE.authorizedByTitle}</div>
@@ -208,9 +206,9 @@ export default function InvoiceSheet({ doc }) {
         </div>
       </div>
 
-      <div style={s.footer}>
-        <span>{COMPANY_PROFILE.name} &nbsp;|&nbsp; {COMPANY_PROFILE.website} &nbsp;|&nbsp; {COMPANY_PROFILE.email}</span>
-        <span>{doc.doc_number}</span>
+      <div data-pdf-footer="true" style={s.footer}>
+        <span>{COMPANY_PROFILE.name} &nbsp;|&nbsp; {COMPANY_PROFILE.website} &nbsp;|&nbsp; {COMPANY_PROFILE.email} &nbsp;|&nbsp; {doc.doc_number}</span>
+        <span data-pdf-pagenum="true" style={{ minWidth: '70px', textAlign: 'right' }}>&nbsp;</span>
       </div>
     </div>
   );
@@ -218,6 +216,7 @@ export default function InvoiceSheet({ doc }) {
 
 const s = {
   sheet: {
+    position: 'relative',
     width: '794px',
     minHeight: '1123px',
     backgroundColor: '#FFFFFF',
@@ -231,32 +230,37 @@ const s = {
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact'
   },
+  // Page frame for the browser/print view. The PDF exporter draws its own per page.
+  frame: {
+    position: 'absolute',
+    top: '14px',
+    left: '14px',
+    right: '14px',
+    bottom: '14px',
+    border: `1.5px solid ${COLORS.navy}`,
+    pointerEvents: 'none'
+  },
   header: {
-    backgroundColor: COLORS.navy,
-    padding: '34px 56px 30px',
+    padding: '34px 56px 14px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  logoBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '14px',
-    padding: '8px 16px',
-    width: '170px',
-    height: '82px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
+  logo: { height: '62px', maxWidth: '180px', objectFit: 'contain' },
+  rule: {
+    margin: '0 56px',
+    borderTop: `1.5px solid ${COLORS.navy}`,
+    borderBottom: `3px solid ${COLORS.gold}`,
+    height: '4px',
+    boxSizing: 'content-box'
   },
-  logo: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
-  heading: { color: '#FFFFFF', fontSize: '34px', fontWeight: 800, letterSpacing: '1px', lineHeight: 1.1 },
-  headerSub: { color: '#D8DEE9', fontSize: '13px', marginTop: '10px' },
-  headerNumber: { color: COLORS.gold, fontWeight: 700, fontSize: '13px', marginTop: '8px' },
-  goldBar: { height: '5px', backgroundColor: COLORS.gold },
-  body: { padding: '28px 56px 20px', flex: 1 },
+  heading: { color: COLORS.navy, fontSize: '34px', fontWeight: 800, letterSpacing: '1px', lineHeight: 1.1 },
+  headerSub: { color: COLORS.muted, fontSize: '13px', marginTop: '8px' },
+  headerNumber: { color: '#A9834F', fontWeight: 700, fontSize: '13px', marginTop: '6px' },
+  body: { padding: '20px 56px 16px', flex: 1 },
   metaTable: {
     display: 'flex',
-    border: `1px solid ${COLORS.border}`,
+    border: `1px solid ${COLORS.navy}`,
     marginBottom: '20px'
   },
   metaCell: {
@@ -268,28 +272,31 @@ const s = {
   partiesRow: { display: 'flex', border: `1px solid ${COLORS.navy}`, marginBottom: '16px' },
   partyCol: { flex: 1 },
   partyHeader: {
-    backgroundColor: COLORS.navy,
-    color: '#8E9AAF',
+    backgroundColor: COLORS.head,
+    color: COLORS.navy,
     fontSize: '10.5px',
     fontWeight: 700,
     letterSpacing: '0.4px',
-    padding: '9px 12px'
+    padding: '9px 12px',
+    borderBottom: `1px solid ${COLORS.navy}`
   },
-  partyBody: { padding: '10px 12px', minHeight: '82px' },
+  partyBody: { padding: '8px 12px', minHeight: '72px' },
   sectionTitle: {
     fontSize: '15px',
     fontWeight: 800,
     color: COLORS.navy,
     margin: '14px 0 8px',
-    letterSpacing: '0.2px'
+    letterSpacing: '0.2px',
+    paddingBottom: '4px',
+    borderBottom: `2px solid ${COLORS.gold}`
   },
   itemsTable: { width: '100%', borderCollapse: 'collapse' },
   th: {
-    backgroundColor: COLORS.navy,
-    color: '#FFFFFF',
+    backgroundColor: COLORS.head,
+    color: COLORS.navy,
     fontSize: '11.5px',
     fontWeight: 700,
-    padding: '11px 12px',
+    padding: '10px 12px',
     textAlign: 'center',
     border: `1px solid ${COLORS.navy}`
   },
@@ -297,6 +304,11 @@ const s = {
     padding: '10px 12px',
     border: `1px solid ${COLORS.border}`,
     verticalAlign: 'middle'
+  },
+  totalCell: {
+    fontWeight: 700,
+    borderTop: `1.5px solid ${COLORS.navy}`,
+    borderBottom: `1.5px solid ${COLORS.navy}`
   },
   detailLine: { color: COLORS.muted, fontSize: '12px' },
   wordsBox: {
@@ -317,13 +329,15 @@ const s = {
     fontSize: '11.5px'
   },
   signRow: { display: 'flex', border: `1px solid ${COLORS.border}`, marginTop: '16px' },
-  signCol: { flex: 1, padding: '12px', minHeight: '70px' },
+  signCol: { flex: 1, padding: '10px 12px', minHeight: '58px' },
   footer: {
-    backgroundColor: COLORS.navy,
-    color: '#FFFFFF',
+    margin: '0 56px',
+    padding: '10px 0 26px',
+    borderTop: `1.5px solid ${COLORS.navy}`,
+    color: COLORS.navy,
     fontSize: '11px',
-    padding: '18px 56px',
     display: 'flex',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    gap: '12px'
   }
 };

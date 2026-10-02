@@ -8,6 +8,7 @@ const COLORS = {
   gold: '#C9A877',
   border: '#D5DEE9',
   panel: '#F8FAFC',
+  head: '#EEF2F7',
   text: '#111827',
   muted: '#52606D',
   soft: '#F5EFE3'
@@ -49,17 +50,21 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
 
   return (
     <div style={s.sheet}>
-      <div style={s.header}>
-        <div style={s.logoBox}><img src="/logo.png" alt="Gloma" style={s.logo} /></div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={s.heading}>PAYSLIP</div>
-          <div style={s.headerSub}>{monthLabel(run.month)}</div>
-        </div>
-      </div>
-      <div style={s.goldBar} />
+      <div data-pdf-frame="true" style={s.frame} />
 
-      <div style={s.body}>
-        <div style={s.metaRow}>
+      <div data-pdf-header="true">
+        <div style={s.header}>
+          <img src="/logo.png" alt="Gloma" style={s.logo} />
+          <div style={{ textAlign: 'right' }}>
+            <div style={s.heading}>PAYSLIP</div>
+            <div style={s.headerSub}>{monthLabel(run.month)}</div>
+          </div>
+        </div>
+        <div style={s.rule} />
+      </div>
+
+      <div data-pdf-body="true" style={s.body}>
+        <div data-pdf-block="true" style={s.metaRow}>
           <div style={s.metaCell}>
             <div style={s.metaLabel}>EMPLOYEE</div>
             <div style={{ fontWeight: 600 }}>{run.employee_name}</div>
@@ -82,7 +87,7 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
 
         <table style={s.table}>
           <thead>
-            <tr>
+            <tr data-pdf-keep="true">
               <th style={{ ...s.th, textAlign: 'left' }}>EARNINGS</th>
               <th style={{ ...s.th, width: '160px' }}>AMOUNT (LKR)</th>
             </tr>
@@ -103,7 +108,7 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
 
         <table style={{ ...s.table, marginTop: '16px' }}>
           <thead>
-            <tr>
+            <tr data-pdf-keep="true">
               <th style={{ ...s.th, textAlign: 'left' }}>DEDUCTIONS</th>
               <th style={{ ...s.th, width: '160px' }}>AMOUNT (LKR)</th>
             </tr>
@@ -128,22 +133,22 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
           </tbody>
         </table>
 
-        <div style={s.netBox}>
+        <div data-pdf-block="true" style={s.netBox}>
           <span>NET PAY</span>
           <span>LKR {formatMoney(totals.net)}</span>
         </div>
-        <div style={s.wordsBox}>Amount in Words: {amountInWords(totals.net)}</div>
+        <div data-pdf-block="true" style={s.wordsBox}>Amount in Words: {amountInWords(totals.net)}</div>
 
         {employerTotal > 0 && (
-          <div style={s.employerBox}>
+          <div data-pdf-block="true" style={s.employerBox}>
             Employer contributions this month (not deducted from your pay): EPF {epfEmployerRate}% LKR {formatMoney(run.epf_employer)}
             {Number(run.etf_employer) > 0 && `, ETF ${etfRate}% LKR ${formatMoney(run.etf_employer)}`}.
           </div>
         )}
 
-        {run.notes && <div style={s.noteBox}>{run.notes}</div>}
+        {run.notes && <div data-pdf-block="true" style={s.noteBox}>{run.notes}</div>}
 
-        <div style={s.signRow}>
+        <div data-pdf-block="true" style={s.signRow}>
           <div style={s.signCol}>
             <div style={{ marginTop: '34px' }}>______________________________</div>
             <div>Authorized By</div>
@@ -157,9 +162,9 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
         </div>
       </div>
 
-      <div style={s.footer}>
-        <span>{COMPANY_PROFILE.name} &nbsp;|&nbsp; {COMPANY_PROFILE.website} &nbsp;|&nbsp; {COMPANY_PROFILE.email}</span>
-        <span>Confidential</span>
+      <div data-pdf-footer="true" style={s.footer}>
+        <span>{COMPANY_PROFILE.name} &nbsp;|&nbsp; {COMPANY_PROFILE.website} &nbsp;|&nbsp; {COMPANY_PROFILE.email} &nbsp;|&nbsp; Confidential</span>
+        <span data-pdf-pagenum="true" style={{ minWidth: '70px', textAlign: 'right' }}>&nbsp;</span>
       </div>
     </div>
   );
@@ -167,6 +172,7 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
 
 const s = {
   sheet: {
+    position: 'relative',
     width: '794px',
     minHeight: '1123px',
     backgroundColor: '#FFFFFF',
@@ -180,36 +186,40 @@ const s = {
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact'
   },
+  frame: {
+    position: 'absolute',
+    top: '14px',
+    left: '14px',
+    right: '14px',
+    bottom: '14px',
+    border: `1.5px solid ${COLORS.navy}`,
+    pointerEvents: 'none'
+  },
   header: {
-    backgroundColor: COLORS.navy,
-    padding: '34px 56px 30px',
+    padding: '34px 56px 14px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  logoBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '14px',
-    padding: '8px 16px',
-    width: '170px',
-    height: '82px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
+  logo: { height: '62px', maxWidth: '180px', objectFit: 'contain' },
+  rule: {
+    margin: '0 56px',
+    borderTop: `1.5px solid ${COLORS.navy}`,
+    borderBottom: `3px solid ${COLORS.gold}`,
+    height: '4px',
+    boxSizing: 'content-box'
   },
-  logo: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
-  heading: { color: '#FFFFFF', fontSize: '34px', fontWeight: 800, letterSpacing: '1px', lineHeight: 1.1 },
-  headerSub: { color: COLORS.gold, fontWeight: 700, fontSize: '14px', marginTop: '8px' },
-  goldBar: { height: '5px', backgroundColor: COLORS.gold },
-  body: { padding: '28px 56px 20px', flex: 1 },
-  metaRow: { display: 'flex', border: `1px solid ${COLORS.border}`, marginBottom: '20px' },
+  heading: { color: COLORS.navy, fontSize: '34px', fontWeight: 800, letterSpacing: '1px', lineHeight: 1.1 },
+  headerSub: { color: '#A9834F', fontWeight: 700, fontSize: '14px', marginTop: '8px' },
+  body: { padding: '20px 56px 16px', flex: 1 },
+  metaRow: { display: 'flex', border: `1px solid ${COLORS.navy}`, marginBottom: '20px' },
   metaCell: { flex: 1, padding: '9px 12px', borderRight: `1px solid ${COLORS.border}` },
   metaLabel: { fontSize: '10.5px', fontWeight: 700, color: COLORS.muted, letterSpacing: '0.4px', marginBottom: '4px' },
   metaSub: { fontSize: '11.5px', color: COLORS.muted },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: {
-    backgroundColor: COLORS.navy,
-    color: '#FFFFFF',
+    backgroundColor: COLORS.head,
+    color: COLORS.navy,
     fontSize: '11.5px',
     fontWeight: 700,
     padding: '10px 12px',
@@ -221,8 +231,9 @@ const s = {
     justifyContent: 'space-between',
     marginTop: '18px',
     padding: '14px 16px',
-    backgroundColor: COLORS.navy,
-    color: '#FFFFFF',
+    backgroundColor: COLORS.soft,
+    border: `2px solid ${COLORS.navy}`,
+    color: COLORS.navy,
     fontWeight: 800,
     fontSize: '16px'
   },
@@ -239,11 +250,13 @@ const s = {
   signRow: { display: 'flex', border: `1px solid ${COLORS.border}`, marginTop: '28px' },
   signCol: { flex: 1, padding: '14px 12px 12px' },
   footer: {
-    backgroundColor: COLORS.navy,
-    color: '#FFFFFF',
+    margin: '0 56px',
+    padding: '10px 0 26px',
+    borderTop: `1.5px solid ${COLORS.navy}`,
+    color: COLORS.navy,
     fontSize: '11px',
-    padding: '18px 56px',
     display: 'flex',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    gap: '12px'
   }
 };
