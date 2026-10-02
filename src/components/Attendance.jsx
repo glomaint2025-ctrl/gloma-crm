@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Clock, AlertTriangle, CheckCheck, Trash2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Clock, CheckCheck, Trash2, Info } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { splitWorkedMinutes, isHoliday, formatMinutes } from '../workHours';
 import {
   ATTENDANCE_STATUSES,
-  LEAVE_ENTITLEMENT,
+  leaveEntitlement,
   currentMonthKey,
   shiftMonthKey,
   monthLabel,
@@ -23,6 +23,7 @@ const STATUS_COLORS = {
   'Sick Leave': '#F59E0B',
   'No Pay Leave': '#EF4444',
   'Half Day': '#F59E0B',
+  'Not employed': '#9CA3AF',
   Unmarked: '#F59E0B',
   Holiday: '#9CA3AF',
   Upcoming: '#9CA3AF'
@@ -37,11 +38,17 @@ const timeOf = (iso) => {
 // Builds a local-time ISO string from a YYYY-MM-DD date and an HH:MM time.
 const toISO = (date, time) => new Date(`${date}T${time}:00`).toISOString();
 
-export default function Attendance({ profiles = [], timeLogs = [], currentUserProfile = {}, onRefreshData }) {
+export default function Attendance({
+  employees = [],
+  marks = [],
+  timeLogs = [],
+  settings,
+  currentUserProfile = {},
+  onReload,
+  onRefreshData
+}) {
   const [employeeId, setEmployeeId] = useState('');
   const [month, setMonth] = useState(currentMonthKey());
-  const [marks, setMarks] = useState([]);
-  const [loadError, setLoadError] = useState('');
   const [busyDate, setBusyDate] = useState('');
   const [timeForm, setTimeForm] = useState(null);
   const [formError, setFormError] = useState('');
@@ -49,23 +56,17 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
   const today = toLocalDateStr();
   const year = Number(month.split('-')[0]);
 
-  const selectedId = employeeId || profiles[0]?.id || '';
-
-  const loadMarks = useCallback(async () => {
-    const { data, error } = await supabase.from('attendance_marks').select('*');
-    setLoadError(error ? error.message : '');
-    setMarks(data || []);
-  }, []);
-
-  useEffect(() => {
-    loadMarks();
-  }, [loadMarks]);
+  const activeEmployees = employees.filter(e => e.status === 'Active');
+  const selectedId = employeeId || activeEmployees[0]?.id || '';
+  const employee = employees.find(e => e.id === selectedId) || null;
+  const tracked = !!employee?.profile_id;
 
   const days = useMemo(
-    () => (selectedId ? buildAttendance({ employeeId: selectedId, monthKey: month, timeLogs, marks, today }) : []),
-    [selectedId, month, timeLogs, marks, today]
+    () => (employee ? buildAttendance({ employee, monthKey: month, timeLogs, marks, today }) : []),
+    [employee, month, timeLogs, marks, today]
   );
 
+  const entitlement = leaveEntitlement(settings);
   const usage = selectedId ? leaveUsage(marks, selectedId, year) : {};
   const totalWorked = days.reduce((sum, d) => sum + d.regularMinutes, 0);
   const totalOvertime = days.reduce((sum, d) => sum + d.overtimeMinutes, 0);
@@ -86,7 +87,7 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
         marked_by: currentUserProfile.id
       }));
     }
-    await loadMarks();
+    if (onReload) await onReload();
     setBusyDate('');
     if (error) alert(`Could not save attendance: ${error.message}`);
   };
@@ -102,7 +103,7 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
         marked_by: currentUserProfile.id
       }))
     );
-    await loadMarks();
+    if (onReload) await onReload();
     setBusyDate('');
     if (error) alert(`Could not save attendance: ${error.message}`);
   };
@@ -150,8 +151,8 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
       ? await supabase.from('time_logs').update(fields).eq('id', timeForm.logId)
       : await supabase.from('time_logs').insert({
           ...fields,
-          user_id: selectedId,
-          employee_name: profiles.find(p => p.id === selectedId)?.full_name,
+          user_id: employee.profile_id,
+          employee_name: employee?.full_name,
           work_date: timeForm.date,
           source: 'manual'
         });
@@ -184,7 +185,7 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
           value={selectedId}
           onChange={(e) => setEmployeeId(e.target.value)}
         >
-          {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>)}
+          {activeEmployees.map(p => <option key={p.id} value={p.id}>{p.full_name}{p.designation ? ` (${p.designation})` : ''}</option>)}
         </select>
         <div style={s.monthNav}>
           <button style={s.navBtn} onClick={() => setMonth(shiftMonthKey(month, -1))}><ChevronLeft size={16} /></button>
@@ -198,11 +199,12 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
         )}
       </div>
 
-      {loadError && (
+      {employee && !tracked && (
         <div className="glass-panel" style={s.warning}>
-          <AlertTriangle size={18} color="#F59E0B" />
+          <Info size={18} color="var(--color-gold)" />
           <span>
-            Could not load attendance ({loadError}). Run <strong>supabase_phase2_payroll_finance.sql</strong> in the Supabase SQL Editor.
+            {employee.full_name} has no login account, so there is no time clock. Working days you do not mark are counted as
+            Present; mark leave, absences and half days below.
           </span>
         </div>
       )}
@@ -216,7 +218,7 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
           <div style={s.summaryLabel}>Overtime</div>
           <div style={{ ...s.summaryValue, color: '#F59E0B' }}>{formatMinutes(totalOvertime)}</div>
         </div>
-        {Object.entries(LEAVE_ENTITLEMENT).map(([type, allowed]) => (
+        {Object.entries(entitlement).map(([type, allowed]) => (
           <div key={type} className="glass-panel" style={s.summaryCard}>
             <div style={s.summaryLabel}>{type} {year}</div>
             <div style={s.summaryValue}>
@@ -274,14 +276,16 @@ export default function Attendance({ profiles = [], timeLogs = [], currentUserPr
                         onChange={(e) => setMark(day, e.target.value)}
                         style={{ ...s.statusSelect, color: STATUS_COLORS[day.status], borderColor: STATUS_COLORS[day.status] }}
                       >
-                        <option value="">{day.mark ? 'Auto' : `Auto (${day.status})`}</option>
+                        <option value="">{day.mark ? 'Auto' : `Auto (${day.status}${day.assumed ? ', assumed' : ''})`}</option>
                         {ATTENDANCE_STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
                       </select>
                     </td>
                     <td>
-                      <button style={s.iconBtn} title="Edit time clock" onClick={() => openTimeEditor(day)}>
-                        <Clock size={15} color="var(--color-gold)" />
-                      </button>
+                      {tracked && (
+                        <button style={s.iconBtn} title="Edit time clock" onClick={() => openTimeEditor(day)}>
+                          <Clock size={15} color="var(--color-gold)" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

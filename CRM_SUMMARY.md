@@ -292,6 +292,18 @@ Coordinator & Accountant; add a dedicated Company Finance tab for the same three
 * Website updates reach the desktop app automatically (it loads the live site). `UpdateBanner.jsx` polls `/version.json` (emitted by `vite.config.js` with a per-build id) and shows "Reload to update" when a newer deploy exists.
 * The Electron shell now uses `electron-updater` against GitHub Releases of this (public) repo, version 1.1.0. See `desktop/README.md` for the release steps. Legacy role fix: `supabase_fix_accountant_role.sql`.
 
+### Problem 18 — HR employee registry and advanced payroll (2026-10-02)
+
+* **Finance -> HR & Payroll** is now a hub (`HrPayroll.jsx`) with Overview (to-do list: missing salaries, uncalculated/unfinalized payroll, EPF/ETF due date, unmarked attendance, probation/contract ends, missing bank details, birthdays), Employees, Payroll, Attendance & leave, Loans & advances, Reports and Settings. Visible to Developer, Admin and Coordinator & Accountant only. Shared data comes from `src/hrData.js`.
+* **Employees** (`Employees.jsx`, table `employees`): an employee does NOT need a login. Personal, employment, bank/EPF details, salary structure (basic + any number of allowances, each flagged EPF-able or not; EPF/ETF/APIT switches), documents (private `finance-docs` bucket), gratuity estimate. A login can be created later from the employee (or an existing account linked); creating a login with the same email auto-links via a DB trigger. Payroll, salaries, attendance marks and payslips now reference `employees.id` (existing profiles were migrated with the same id).
+* **Payroll engine** (`payrollUtils.js`): OT, no-pay days, EPF 8%/12% and ETF 3% on basic (less unpaid days) plus EPF-flagged allowances (never overtime/incentives), optional APIT (IRD 2025/26 monthly table), loan instalments. Rules and leave entitlements are editable under Settings (`payroll_settings`). Bulk Finalize / Mark paid / Print all payslips, Reset month, Undo paid, History.
+* **Loans & advances** (`employee_loans`, `loan_repayments`): instalments are deducted automatically; only Finalized/Paid payslips reduce the balance, and repayments vanish with their payslip.
+* **Reports**: payroll register, bank transfer list, EPF/ETF Form C worksheet with the due date (last working day of the next month), yearly summary; all downloadable as CSV.
+* **My Payslips** (all roles): an employee sees only their own finalized/paid payslips (RLS via `my_employee_id()`).
+* **Employees without a login** have no time clock: unmarked working days count as Present and HR marks leave/absence in Attendance & leave.
+* **SQL to run**: `supabase_phase3_hr_payroll.sql` after phases 1 and 2 (validated locally against a database that already had payroll data, including RLS and migration checks). It also adds Osada and Prarthana as employees with their salaries unless they already exist.
+* **Assumptions to confirm**: statutory switches default OFF per employee (turn them on under Employees); APIT table and the gratuity rule should be confirmed with the accountant; leave entitlement defaults 14/7/7.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.

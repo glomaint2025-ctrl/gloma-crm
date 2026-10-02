@@ -1,6 +1,6 @@
 import React from 'react';
 import { COMPANY_PROFILE, formatMoney, amountInWords } from '../invoiceUtils';
-import { runTotals, monthLabel, hourlyRate, OT_MULTIPLIER } from '../payrollUtils';
+import { runTotals, monthLabel, hourlyRate, allowanceItems, DEFAULT_PAYROLL_SETTINGS } from '../payrollUtils';
 
 // Print-ready A4 payslip. Fixed colours so it prints identically in light/dark mode.
 const COLORS = {
@@ -9,19 +9,27 @@ const COLORS = {
   border: '#D5DEE9',
   panel: '#F8FAFC',
   text: '#111827',
-  muted: '#52606D'
+  muted: '#52606D',
+  soft: '#F5EFE3'
 };
 
-export default function PayslipSheet({ run }) {
+export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL_SETTINGS }) {
   const totals = runTotals(run);
   const additions = (Array.isArray(run.additions) ? run.additions : []).filter(a => Number(a.amount));
   const deductions = (Array.isArray(run.deductions) ? run.deductions : []).filter(d => Number(d.amount));
+  const loanLines = (Array.isArray(run.loan_details) ? run.loan_details : []).filter(l => Number(l.amount));
 
+  // Show the rates actually applied to this payslip (settings may have changed since).
+  const base = Number(run.epf_base) || 0;
+  const pct = (amount, fallback) => (base > 0 && Number(amount) > 0 ? Math.round((Number(amount) / base) * 10000) / 100 : fallback);
+  const epfEmployeeRate = pct(run.epf_employee, settings.epf_employee_rate);
+  const epfEmployerRate = pct(run.epf_employer, settings.epf_employer_rate);
+  const etfRate = pct(run.etf_employer, settings.etf_rate);
   const earnings = [
     ['Basic salary', run.basic_salary],
-    ['Fixed allowance', run.fixed_allowance],
+    ...allowanceItems(run).map(a => [a.label, a.amount]),
     [
-      `Overtime (${Number(run.ot_hours) || 0} h x ${OT_MULTIPLIER} x LKR ${formatMoney(hourlyRate(run.basic_salary))}/h)`,
+      `Overtime (${Number(run.ot_hours) || 0} h x ${settings.ot_multiplier} x LKR ${formatMoney(hourlyRate(run.basic_salary, settings))}/h)`,
       run.ot_amount
     ],
     ...additions.map(a => [a.label || 'Addition', a.amount])
@@ -29,8 +37,15 @@ export default function PayslipSheet({ run }) {
 
   const deductionRows = [
     [`No-pay days (${Number(run.no_pay_days) || 0})`, run.no_pay_deduction],
+    [`EPF employee contribution (${epfEmployeeRate}%)`, run.epf_employee],
+    ['APIT income tax', run.apit],
+    ...(loanLines.length
+      ? loanLines.map(l => [l.label || 'Loan repayment', l.amount])
+      : [['Loan / advance repayment', run.loan_deduction]]),
     ...deductions.map(d => [d.label || 'Deduction', d.amount])
   ].filter(([, amount]) => Number(amount));
+
+  const employerTotal = (Number(run.epf_employer) || 0) + (Number(run.etf_employer) || 0);
 
   return (
     <div style={s.sheet}>
@@ -48,6 +63,12 @@ export default function PayslipSheet({ run }) {
           <div style={s.metaCell}>
             <div style={s.metaLabel}>EMPLOYEE</div>
             <div style={{ fontWeight: 600 }}>{run.employee_name}</div>
+            {employee?.designation && <div style={s.metaSub}>{employee.designation}</div>}
+          </div>
+          <div style={s.metaCell}>
+            <div style={s.metaLabel}>NIC / EPF NO</div>
+            <div>{employee?.nic || '-'}</div>
+            <div style={s.metaSub}>{employee?.epf_no ? `EPF ${employee.epf_no}` : ''}</div>
           </div>
           <div style={s.metaCell}>
             <div style={s.metaLabel}>PAY PERIOD</div>
@@ -67,13 +88,13 @@ export default function PayslipSheet({ run }) {
             </tr>
           </thead>
           <tbody>
-            {earnings.map(([label, amount]) => (
-              <tr key={label}>
+            {earnings.map(([label, amount], i) => (
+              <tr key={`${label}-${i}`}>
                 <td style={s.td}>{label}</td>
                 <td style={{ ...s.td, textAlign: 'right' }}>{formatMoney(amount)}</td>
               </tr>
             ))}
-            <tr style={{ backgroundColor: s.totalBg }}>
+            <tr style={{ backgroundColor: COLORS.soft }}>
               <td style={{ ...s.td, fontWeight: 700 }}>Gross pay</td>
               <td style={{ ...s.td, textAlign: 'right', fontWeight: 700 }}>{formatMoney(totals.gross)}</td>
             </tr>
@@ -94,13 +115,13 @@ export default function PayslipSheet({ run }) {
                 <td style={{ ...s.td, textAlign: 'right' }}>0.00</td>
               </tr>
             )}
-            {deductionRows.map(([label, amount]) => (
-              <tr key={label}>
+            {deductionRows.map(([label, amount], i) => (
+              <tr key={`${label}-${i}`}>
                 <td style={s.td}>{label}</td>
                 <td style={{ ...s.td, textAlign: 'right' }}>{formatMoney(amount)}</td>
               </tr>
             ))}
-            <tr style={{ backgroundColor: s.totalBg }}>
+            <tr style={{ backgroundColor: COLORS.soft }}>
               <td style={{ ...s.td, fontWeight: 700 }}>Total deductions</td>
               <td style={{ ...s.td, textAlign: 'right', fontWeight: 700 }}>{formatMoney(totals.totalDeductions)}</td>
             </tr>
@@ -112,6 +133,13 @@ export default function PayslipSheet({ run }) {
           <span>LKR {formatMoney(totals.net)}</span>
         </div>
         <div style={s.wordsBox}>Amount in Words: {amountInWords(totals.net)}</div>
+
+        {employerTotal > 0 && (
+          <div style={s.employerBox}>
+            Employer contributions this month (not deducted from your pay): EPF {epfEmployerRate}% LKR {formatMoney(run.epf_employer)}
+            {Number(run.etf_employer) > 0 && `, ETF ${etfRate}% LKR ${formatMoney(run.etf_employer)}`}.
+          </div>
+        )}
 
         {run.notes && <div style={s.noteBox}>{run.notes}</div>}
 
@@ -138,7 +166,6 @@ export default function PayslipSheet({ run }) {
 }
 
 const s = {
-  totalBg: '#F5EFE3',
   sheet: {
     width: '794px',
     minHeight: '1123px',
@@ -178,6 +205,7 @@ const s = {
   metaRow: { display: 'flex', border: `1px solid ${COLORS.border}`, marginBottom: '20px' },
   metaCell: { flex: 1, padding: '9px 12px', borderRight: `1px solid ${COLORS.border}` },
   metaLabel: { fontSize: '10.5px', fontWeight: 700, color: COLORS.muted, letterSpacing: '0.4px', marginBottom: '4px' },
+  metaSub: { fontSize: '11.5px', color: COLORS.muted },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: {
     backgroundColor: COLORS.navy,
@@ -199,10 +227,11 @@ const s = {
     fontSize: '16px'
   },
   wordsBox: { border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.panel, padding: '10px 12px', marginTop: '10px' },
+  employerBox: { marginTop: '10px', fontSize: '11.5px', color: COLORS.muted },
   noteBox: {
     marginTop: '14px',
     padding: '10px 12px',
-    backgroundColor: '#F5EFE3',
+    backgroundColor: COLORS.soft,
     border: `1px solid ${COLORS.gold}`,
     color: COLORS.muted,
     fontSize: '11.5px'

@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { Wallet, TrendingUp, TrendingDown, CheckCircle2, XCircle, Filter, Pencil, Banknote, CalendarCheck, Receipt, Globe } from 'lucide-react';
-import Payroll from './Payroll';
-import Attendance from './Attendance';
+import { Wallet, TrendingUp, TrendingDown, CheckCircle2, XCircle, Filter, Pencil, Users, Receipt, Globe } from 'lucide-react';
+import HrPayroll from './HrPayroll';
 import Expenses from './Expenses';
 
 const localTranslations = {
   en: {
     title: "Company Finance",
-    subtitle: "Website payments, payroll, attendance and company expenses.",
+    subtitle: "Website payments, HR & payroll and company expenses.",
     noAccess: "Only Admin, Manager, Coordinator & Accountant, or Developer accounts can view company finances.",
     totalCollected: "Total Collected",
     totalOutstanding: "Total Outstanding",
@@ -93,6 +92,7 @@ export default function Finance({
   currentUserProfile = {},
   onSaveTask,
   onRefreshData,
+  onCreateMemberAccount,
   lang = 'en'
 }) {
   const t = localTranslations[lang] || localTranslations.en;
@@ -168,8 +168,7 @@ export default function Finance({
       <div style={styles.tabBar}>
         {[
           { key: 'website', label: 'Website payments', icon: Globe, show: true },
-          { key: 'payroll', label: 'Payroll', icon: Banknote, show: canSeePayroll },
-          { key: 'attendance', label: 'Attendance & leave', icon: CalendarCheck, show: canSeePayroll },
+          { key: 'hr', label: 'HR & Payroll', icon: Users, show: canSeePayroll },
           { key: 'expenses', label: 'Expenses & receipts', icon: Receipt, show: true }
         ].filter(item => item.show).map(({ key, label, icon: Icon }) => (
           <button
@@ -186,11 +185,14 @@ export default function Finance({
         ))}
       </div>
 
-      {tab === 'payroll' && canSeePayroll && (
-        <Payroll profiles={profiles} timeLogs={timeLogs} currentUserProfile={currentUserProfile} />
-      )}
-      {tab === 'attendance' && canSeePayroll && (
-        <Attendance profiles={profiles} timeLogs={timeLogs} currentUserProfile={currentUserProfile} onRefreshData={onRefreshData} />
+      {tab === 'hr' && canSeePayroll && (
+        <HrPayroll
+          profiles={profiles}
+          timeLogs={timeLogs}
+          currentUserProfile={currentUserProfile}
+          onCreateMemberAccount={onCreateMemberAccount}
+          onRefreshData={onRefreshData}
+        />
       )}
       {tab === 'expenses' && <Expenses currentUserProfile={currentUserProfile} />}
 

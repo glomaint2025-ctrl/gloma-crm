@@ -17,6 +17,7 @@ import Invoices from './components/Invoices';
 import ClockReminder from './components/ClockReminder';
 import UpdateBanner from './components/UpdateBanner';
 import DesktopUpdate from './components/DesktopUpdate';
+import MyPayslips from './components/MyPayslips';
 import { splitWorkedMinutes, isHoliday, getClosingTime, todayStr, OFFICE_OPEN_TIME } from './workHours';
 
 import {
@@ -36,7 +37,8 @@ import {
   X,
   Clock,
   Wallet,
-  FileText
+  FileText,
+  Receipt
 } from 'lucide-react';
 
 const sidebarTranslations = {
@@ -50,6 +52,7 @@ const sidebarTranslations = {
     workHours: "Work Hours",
     finance: "Company Finance",
     invoices: "Invoices & Quotations",
+    payslips: "My Payslips",
     team: "Team Members",
     roles: "Manage Roles",
     settings: "System Settings",
@@ -66,6 +69,7 @@ const sidebarTranslations = {
     workHours: "වැඩ කරන වේලාවන්",
     finance: "සමාගමේ ගිණුම්කරණය",
     invoices: "ඉන්වොයිස් සහ මිල ගණන්",
+    payslips: "මගේ වැටුප් පත්‍රිකා",
     team: "කණ්ඩායම් සාමාජිකයින්",
     roles: "අවසර කළමනාකරණය",
     settings: "පද්ධති සැකසුම්",
@@ -82,6 +86,7 @@ const sidebarTranslations = {
     workHours: "பணி நேரங்கள்",
     finance: "நிறுவன நிதி",
     invoices: "விலைப்பட்டியல்கள்",
+    payslips: "எனது சம்பளச் சீட்டுகள்",
     team: "குழு உறுப்பினர்கள்",
     roles: "பாத்திர நிர்வாகம்",
     settings: "அமைப்புகள்",
@@ -878,6 +883,13 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => navTo('payslips')}
+            className={`nav-btn ${activeView === 'payslips' ? 'active' : ''}`}
+          >
+            <Receipt size={18} /> {sbT.payslips}
+          </button>
+
+          <button
             onClick={() => navTo('workHours')}
             className={`nav-btn ${activeView === 'workHours' ? 'active' : ''}`}
           >
@@ -1066,8 +1078,13 @@ export default function App() {
             currentUserProfile={currentUserProfile}
             onSaveTask={handleSaveTask}
             onRefreshData={refreshData}
+            onCreateMemberAccount={handleCreateMemberAccount}
             lang={lang}
           />
+        )}
+
+        {activeView === 'payslips' && (
+          <MyPayslips currentUserProfile={currentUserProfile} />
         )}
 
         {activeView === 'invoices' && (
