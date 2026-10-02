@@ -5,6 +5,8 @@ import { supabase } from '../supabaseClient';
 import { formatMoney } from '../invoiceUtils';
 import { monthLabel, runTotals } from '../payrollUtils';
 import PayslipSheet from './PayslipSheet';
+import PdfDownload from './PdfDownload';
+import { pdfFileName } from '../pdfExport';
 
 // An employee's own finalized and paid payslips (the database only returns their own).
 export default function MyPayslips({ currentUserProfile = {} }) {
@@ -65,7 +67,7 @@ export default function MyPayslips({ currentUserProfile = {} }) {
                     <td>{run.status === 'Paid' ? `Paid ${run.paid_date ? String(run.paid_date).substring(0, 10) : ''}` : 'Finalized'}</td>
                     <td>
                       <button className="btn-secondary" style={s.btn} onClick={() => setViewing(run)}>
-                        <Printer size={13} /> View / Print
+                        <Printer size={13} /> View / Download
                       </button>
                     </td>
                   </tr>
@@ -89,7 +91,12 @@ export default function MyPayslips({ currentUserProfile = {} }) {
             <div style={s.modalHeader}>
               <h3>Payslip - {monthLabel(viewing.month)}</h3>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn-primary" onClick={() => window.print()}><Printer size={15} /> Print / Save as PDF</button>
+                <PdfDownload
+                  className="btn-primary"
+                  sheets={[<PayslipSheet key="pdf" run={viewing} employee={employee} />]}
+                  filename={pdfFileName('Payslip', viewing.employee_name, viewing.month)}
+                />
+                <button className="btn-secondary" onClick={() => window.print()}><Printer size={15} /> Print</button>
                 <button className="btn-secondary" onClick={() => setViewing(null)}>Close</button>
               </div>
             </div>

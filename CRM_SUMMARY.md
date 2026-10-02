@@ -304,6 +304,10 @@ Coordinator & Accountant; add a dedicated Company Finance tab for the same three
 * **SQL to run**: `supabase_phase3_hr_payroll.sql` after phases 1 and 2 (validated locally against a database that already had payroll data, including RLS and migration checks). It also adds Osada and Prarthana as employees with their salaries unless they already exist.
 * **Assumptions to confirm**: statutory switches default OFF per employee (turn them on under Employees); APIT table and the gratuity rule should be confirmed with the accountant; leave entitlement defaults 14/7/7.
 
+### Problem 19 — Direct PDF download (2026-10-02)
+
+* Invoices, quotations and payslips have a **Download PDF** button (`PdfDownload.jsx`, `pdfExport.js`: html2canvas + jsPDF, loaded on demand) next to Print; "Print all payslips" downloads one multi-page PDF. The PDF is an image of the A4 sheet, so its text cannot be selected or copied; use Print for a text PDF.
+
 ## 4. Git status (as of end of this session)
 
 * `main` is **fully pushed** — local and `origin/main` both at the latest commit (Login logo fix, commit `3839bfc` at time of writing). No pending push.

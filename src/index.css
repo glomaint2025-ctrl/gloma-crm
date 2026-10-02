@@ -634,4 +634,5 @@ body.light-theme .nav-btn.active {
   html, body { background: #ffffff !important; }
   #root { display: none !important; }
   .print-only-sheet { display: block !important; }
+  .pdf-host { display: none !important; }
 }

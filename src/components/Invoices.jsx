@@ -14,6 +14,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import InvoiceSheet from './InvoiceSheet';
+import PdfDownload from './PdfDownload';
+import { pdfFileName } from '../pdfExport';
 import {
   DOC_TYPES,
   DOC_STATUSES,
@@ -498,8 +500,13 @@ export default function Invoices({
             <div style={s.modalHeader}>
               <h3>{viewingDoc.doc_number}</h3>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn-primary" onClick={() => window.print()}>
-                  <Printer size={15} /> Print / Save as PDF
+                <PdfDownload
+                  className="btn-primary"
+                  sheets={[<InvoiceSheet key="pdf" doc={viewingDoc} />]}
+                  filename={pdfFileName(viewingDoc.doc_number, viewingDoc.client_name)}
+                />
+                <button className="btn-secondary" onClick={() => window.print()}>
+                  <Printer size={15} /> Print
                 </button>
                 <button className="btn-secondary" onClick={() => setViewingDoc(null)}>Close</button>
               </div>
@@ -736,8 +743,12 @@ export default function Invoices({
 
                 <div style={s.modalActions}>
                   <button type="button" className="btn-secondary" onClick={() => setForm(null)}>Cancel</button>
+                  <PdfDownload
+                    sheets={[<InvoiceSheet key="pdf" doc={form} />]}
+                    filename={pdfFileName(form.doc_number, form.client_name)}
+                  />
                   <button type="button" className="btn-secondary" onClick={() => window.print()}>
-                    <Printer size={15} /> Print / PDF
+                    <Printer size={15} /> Print
                   </button>
                   <button type="submit" className="btn-primary" disabled={saving}>
                     {saving ? 'Saving...' : 'Save'}

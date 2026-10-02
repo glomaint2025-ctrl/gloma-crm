@@ -29,6 +29,8 @@ import {
   allowanceItems
 } from '../payrollUtils';
 import PayslipSheet from './PayslipSheet';
+import PdfDownload from './PdfDownload';
+import { pdfFileName } from '../pdfExport';
 
 const STATUS_COLORS = { Draft: '#9CA3AF', Finalized: '#3B82F6', Paid: '#10B981' };
 
@@ -617,7 +619,17 @@ export default function Payroll({
             <div style={s.modalHeader}>
               <h3>{printRuns.length === 1 ? `Payslip - ${printRuns[0].run.employee_name}` : `${printRuns.length} payslips - ${monthLabel(month)}`}</h3>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn-primary" onClick={() => window.print()}><Printer size={15} /> Print / Save as PDF</button>
+                <PdfDownload
+                  className="btn-primary"
+                  label={printRuns.length > 1 ? 'Download all (PDF)' : 'Download PDF'}
+                  sheets={printRuns.map(({ run, employee }) => (
+                    <PayslipSheet key={run.id} run={run} employee={employee} settings={settings} />
+                  ))}
+                  filename={printRuns.length === 1
+                    ? pdfFileName('Payslip', printRuns[0].run.employee_name, printRuns[0].run.month)
+                    : pdfFileName('Payslips', month)}
+                />
+                <button className="btn-secondary" onClick={() => window.print()}><Printer size={15} /> Print</button>
                 <button className="btn-secondary" onClick={() => setPrintRuns(null)}>Close</button>
               </div>
             </div>
