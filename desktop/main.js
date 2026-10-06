@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, session, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, session, dialog, powerMonitor } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -85,9 +85,21 @@ function createWindow() {
     }
   });
 
+  // Windows is shutting down / logging off: stop the work timer before the PC goes off.
+  mainWindow.on('session-end', () => notifyPcOff());
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+// Tells the CRM page the PC is going off (shutdown, log off or sleep) so it can stop
+// the employee's work timer. If the page cannot finish in time, it closes the session
+// at the last moment it was alive the next time the app starts.
+function notifyPcOff() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('gloma:pc-off');
+  }
 }
 
 // The CRM website updates itself on every deploy. This updates the desktop shell
@@ -228,6 +240,9 @@ app.whenReady().then(() => {
     const origin = webContents.getURL();
     callback(permission === 'notifications' && origin.startsWith(APP_URL));
   });
+
+  powerMonitor.on('suspend', () => notifyPcOff());
+  powerMonitor.on('shutdown', () => notifyPcOff());
 
   createTray();
   createWindow();

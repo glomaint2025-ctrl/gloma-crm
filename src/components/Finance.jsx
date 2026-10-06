@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Wallet, TrendingUp, TrendingDown, CheckCircle2, XCircle, Filter, Pencil, Users, Receipt, Globe } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, CheckCircle2, XCircle, Filter, Pencil, Users, Receipt, Globe, BarChart3 } from 'lucide-react';
 import HrPayroll from './HrPayroll';
 import Expenses from './Expenses';
+import Statements from './Statements';
 
 const localTranslations = {
   en: {
@@ -169,7 +170,8 @@ export default function Finance({
         {[
           { key: 'website', label: 'Website payments', icon: Globe, show: true },
           { key: 'hr', label: 'HR & Payroll', icon: Users, show: canSeePayroll },
-          { key: 'expenses', label: 'Expenses & receipts', icon: Receipt, show: true }
+          { key: 'expenses', label: 'Expenses & receipts', icon: Receipt, show: true },
+          { key: 'statements', label: 'Statements', icon: BarChart3, show: true }
         ].filter(item => item.show).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -195,6 +197,7 @@ export default function Finance({
         />
       )}
       {tab === 'expenses' && <Expenses currentUserProfile={currentUserProfile} />}
+      {tab === 'statements' && <Statements tasks={tasks} currentUserProfile={currentUserProfile} />}
 
       {tab === 'website' && (
         <>

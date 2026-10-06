@@ -1,17 +1,29 @@
 import React from 'react';
-import { COMPANY_PROFILE, formatMoney, amountInWords } from '../invoiceUtils';
-import { runTotals, monthLabel, hourlyRate, allowanceItems, DEFAULT_PAYROLL_SETTINGS } from '../payrollUtils';
+import { COMPANY_PROFILE, amountInWords } from '../invoiceUtils';
+import { runTotals, monthLabel, allowanceItems, daysInMonthKey, DEFAULT_PAYROLL_SETTINGS } from '../payrollUtils';
+import { isHoliday } from '../workHours';
 
-// Print-ready A4 payslip. Fixed colours so it prints identically in light/dark mode.
-const COLORS = {
-  navy: '#0F1729',
-  gold: '#C9A877',
-  border: '#D5DEE9',
-  panel: '#F8FAFC',
-  head: '#EEF2F7',
-  text: '#111827',
-  muted: '#52606D',
-  soft: '#F5EFE3'
+// Print-ready payslip on HALF of an A4 sheet (794 x 561 px at 96 dpi): the top half of the
+// page, so two payslips can be cut from one sheet. Fixed colours so it prints identically in
+// light/dark mode. The PDF export keeps it on the top half of an A4 page (no page frame).
+const COLORS = { text: '#111111', line: '#222222', muted: '#444444' };
+
+// 35000 -> "35 000", 1250.5 -> "1 250.50", zero -> "-"
+const fmt = (value) => {
+  const n = Number(value) || 0;
+  if (!n) return '-';
+  const fixed = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  const [whole, dec] = fixed.split('.');
+  return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}${dec ? `.${dec}` : ''}`;
+};
+
+// Working days in the month (Mon-Sat, excluding Sundays and Poya days) less unpaid days.
+const workedDays = (run) => {
+  if (Number.isFinite(Number(run.worked_days)) && run.worked_days !== null && run.worked_days !== undefined) {
+    return Number(run.worked_days);
+  }
+  const working = daysInMonthKey(run.month).filter(d => !isHoliday(d)).length;
+  return Math.max(0, working - (Number(run.no_pay_days) || 0));
 };
 
 export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL_SETTINGS }) {
@@ -20,151 +32,96 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
   const deductions = (Array.isArray(run.deductions) ? run.deductions : []).filter(d => Number(d.amount));
   const loanLines = (Array.isArray(run.loan_details) ? run.loan_details : []).filter(l => Number(l.amount));
 
-  // Show the rates actually applied to this payslip (settings may have changed since).
   const base = Number(run.epf_base) || 0;
   const pct = (amount, fallback) => (base > 0 && Number(amount) > 0 ? Math.round((Number(amount) / base) * 10000) / 100 : fallback);
   const epfEmployeeRate = pct(run.epf_employee, settings.epf_employee_rate);
-  const epfEmployerRate = pct(run.epf_employer, settings.epf_employer_rate);
-  const etfRate = pct(run.etf_employer, settings.etf_rate);
+
   const earnings = [
-    ['Basic salary', run.basic_salary],
+    ['Basic Pay', run.basic_salary],
     ...allowanceItems(run).map(a => [a.label, a.amount]),
-    [
-      `Overtime (${Number(run.ot_hours) || 0} h x ${settings.ot_multiplier} x LKR ${formatMoney(hourlyRate(run.basic_salary, settings))}/h)`,
-      run.ot_amount
-    ],
+    [`Overtime (${Number(run.ot_hours) || 0} h)`, run.ot_amount],
     ...additions.map(a => [a.label || 'Addition', a.amount])
   ].filter(([, amount]) => Number(amount));
 
   const deductionRows = [
-    [`No-pay days (${Number(run.no_pay_days) || 0})`, run.no_pay_deduction],
-    [`EPF employee contribution (${epfEmployeeRate}%)`, run.epf_employee],
-    ['APIT income tax', run.apit],
+    [`No Pay Deductions${Number(run.no_pay_days) ? ` (${Number(run.no_pay_days)} d)` : ''}`, run.no_pay_deduction],
+    [`EPF (${epfEmployeeRate}%)`, run.epf_employee],
+    ['APIT Income Tax', run.apit],
     ...(loanLines.length
-      ? loanLines.map(l => [l.label || 'Loan repayment', l.amount])
-      : [['Loan / advance repayment', run.loan_deduction]]),
+      ? loanLines.map(l => [l.label || 'Salary Advance', l.amount])
+      : [['Salary Advance', run.loan_deduction]]),
     ...deductions.map(d => [d.label || 'Deduction', d.amount])
   ].filter(([, amount]) => Number(amount));
 
-  const employerTotal = (Number(run.epf_employer) || 0) + (Number(run.etf_employer) || 0);
+  const rowCount = Math.max(5, earnings.length, deductionRows.length);
+  const rows = Array.from({ length: rowCount }, (_, i) => [earnings[i], deductionRows[i]]);
+  const netRounded = Math.round(totals.net * 100) / 100;
 
   return (
-    <div style={s.sheet}>
-      <div data-pdf-frame="true" style={s.frame} />
+    <div style={s.sheet} data-pdf-noframe="true" data-pdf-body="true">
+      <div style={s.title}>Payslip</div>
+      <div style={s.company}>{COMPANY_PROFILE.name}</div>
+      <div style={s.empId}>Employee ID : {employee?.epf_no || employee?.nic || '-'}</div>
 
-      <div data-pdf-header="true">
-        <div style={s.header}>
-          <img src="/logo.png" alt="Gloma" style={s.logo} />
-          <div style={{ textAlign: 'right' }}>
-            <div style={s.heading}>PAYSLIP</div>
-            <div style={s.headerSub}>{monthLabel(run.month)}</div>
-          </div>
+      <div style={s.meta}>
+        <div style={s.metaCol}>
+          <div style={s.metaRow}><span style={s.metaKey}>Date of Joining</span><span>: {employee?.join_date ? String(employee.join_date).substring(0, 10) : '-'}</span></div>
+          <div style={s.metaRow}><span style={s.metaKey}>Pay Period</span><span>: {monthLabel(run.month)}</span></div>
+          <div style={s.metaRow}><span style={s.metaKey}>Worked Days</span><span>: {workedDays(run)}</span></div>
         </div>
-        <div style={s.rule} />
-      </div>
-
-      <div data-pdf-body="true" style={s.body}>
-        <div data-pdf-block="true" style={s.metaRow}>
-          <div style={s.metaCell}>
-            <div style={s.metaLabel}>EMPLOYEE</div>
-            <div style={{ fontWeight: 600 }}>{run.employee_name}</div>
-            {employee?.designation && <div style={s.metaSub}>{employee.designation}</div>}
-          </div>
-          <div style={s.metaCell}>
-            <div style={s.metaLabel}>NIC / EPF NO</div>
-            <div>{employee?.nic || '-'}</div>
-            <div style={s.metaSub}>{employee?.epf_no ? `EPF ${employee.epf_no}` : ''}</div>
-          </div>
-          <div style={s.metaCell}>
-            <div style={s.metaLabel}>PAY PERIOD</div>
-            <div>{monthLabel(run.month)}</div>
-          </div>
-          <div style={{ ...s.metaCell, borderRight: 'none' }}>
-            <div style={s.metaLabel}>EMPLOYER</div>
-            <div>{COMPANY_PROFILE.name}</div>
-          </div>
-        </div>
-
-        <table style={s.table}>
-          <thead>
-            <tr data-pdf-keep="true">
-              <th style={{ ...s.th, textAlign: 'left' }}>EARNINGS</th>
-              <th style={{ ...s.th, width: '160px' }}>AMOUNT (LKR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {earnings.map(([label, amount], i) => (
-              <tr key={`${label}-${i}`}>
-                <td style={s.td}>{label}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{formatMoney(amount)}</td>
-              </tr>
-            ))}
-            <tr style={{ backgroundColor: COLORS.soft }}>
-              <td style={{ ...s.td, fontWeight: 700 }}>Gross pay</td>
-              <td style={{ ...s.td, textAlign: 'right', fontWeight: 700 }}>{formatMoney(totals.gross)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <table style={{ ...s.table, marginTop: '16px' }}>
-          <thead>
-            <tr data-pdf-keep="true">
-              <th style={{ ...s.th, textAlign: 'left' }}>DEDUCTIONS</th>
-              <th style={{ ...s.th, width: '160px' }}>AMOUNT (LKR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {deductionRows.length === 0 && (
-              <tr>
-                <td style={{ ...s.td, color: COLORS.muted }}>None</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>0.00</td>
-              </tr>
-            )}
-            {deductionRows.map(([label, amount], i) => (
-              <tr key={`${label}-${i}`}>
-                <td style={s.td}>{label}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{formatMoney(amount)}</td>
-              </tr>
-            ))}
-            <tr style={{ backgroundColor: COLORS.soft }}>
-              <td style={{ ...s.td, fontWeight: 700 }}>Total deductions</td>
-              <td style={{ ...s.td, textAlign: 'right', fontWeight: 700 }}>{formatMoney(totals.totalDeductions)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div data-pdf-block="true" style={s.netBox}>
-          <span>NET PAY</span>
-          <span>LKR {formatMoney(totals.net)}</span>
-        </div>
-        <div data-pdf-block="true" style={s.wordsBox}>Amount in Words: {amountInWords(totals.net)}</div>
-
-        {employerTotal > 0 && (
-          <div data-pdf-block="true" style={s.employerBox}>
-            Employer contributions this month (not deducted from your pay): EPF {epfEmployerRate}% LKR {formatMoney(run.epf_employer)}
-            {Number(run.etf_employer) > 0 && `, ETF ${etfRate}% LKR ${formatMoney(run.etf_employer)}`}.
-          </div>
-        )}
-
-        {run.notes && <div data-pdf-block="true" style={s.noteBox}>{run.notes}</div>}
-
-        <div data-pdf-block="true" style={s.signRow}>
-          <div style={s.signCol}>
-            <div style={{ marginTop: '34px' }}>______________________________</div>
-            <div>Authorized By</div>
-            <div>{COMPANY_PROFILE.name}</div>
-          </div>
-          <div style={{ ...s.signCol, borderLeft: `1px solid ${COLORS.border}` }}>
-            <div style={{ marginTop: '34px' }}>______________________________</div>
-            <div>Employee Signature</div>
-            <div>{run.employee_name}</div>
-          </div>
+        <div style={s.metaCol}>
+          <div style={s.metaRow}><span style={s.metaKey}>Employee Name</span><span>: {run.employee_name}</span></div>
+          <div style={s.metaRow}><span style={s.metaKey}>Designation</span><span>: {employee?.designation || '-'}</span></div>
+          <div style={s.metaRow}><span style={s.metaKey}>Department</span><span>: {employee?.department || '-'}</span></div>
         </div>
       </div>
 
-      <div data-pdf-footer="true" style={s.footer}>
-        <span>{COMPANY_PROFILE.name} &nbsp;|&nbsp; {COMPANY_PROFILE.website} &nbsp;|&nbsp; {COMPANY_PROFILE.email} &nbsp;|&nbsp; Confidential</span>
-        <span data-pdf-pagenum="true" style={{ minWidth: '70px', textAlign: 'right' }}>&nbsp;</span>
+      <table style={s.table} data-pdf-block="true">
+        <thead>
+          <tr>
+            <th style={{ ...s.th, width: '31%' }}>Earnings</th>
+            <th style={{ ...s.th, width: '19%' }}>Amount</th>
+            <th style={{ ...s.th, width: '31%' }}>Deductions</th>
+            <th style={{ ...s.th, width: '19%' }}>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([e, d], i) => (
+            <tr key={i}>
+              <td style={s.td}>{e ? e[0] : ''}</td>
+              <td style={{ ...s.td, ...s.num }}>{e ? fmt(e[1]) : ''}</td>
+              <td style={s.td}>{d ? d[0] : ''}</td>
+              <td style={{ ...s.td, ...s.num }}>{d ? fmt(d[1]) : ''}</td>
+            </tr>
+          ))}
+          <tr>
+            <td style={{ ...s.td, ...s.totalLabel }}>Total Earnings</td>
+            <td style={{ ...s.td, ...s.num }}>{fmt(totals.gross)}</td>
+            <td style={{ ...s.td, ...s.totalLabel }}>Total Deductions</td>
+            <td style={{ ...s.td, ...s.num }}>{fmt(totals.totalDeductions)}</td>
+          </tr>
+          <tr>
+            <td style={s.td}></td>
+            <td style={s.td}></td>
+            <td style={{ ...s.td, ...s.totalLabel, fontWeight: 700 }}>Net Pay</td>
+            <td style={{ ...s.td, ...s.num, fontWeight: 700 }}>{fmt(netRounded)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style={s.netLine}>Rs. {netRounded.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, ' ')}</div>
+      <div style={s.words}>{amountInWords(netRounded)}</div>
+      {run.notes && <div style={s.notes}>{run.notes}</div>}
+
+      <div style={s.signRow}>
+        <div style={s.signCol}>
+          <div>Approved Signature</div>
+          <div style={s.signLine} />
+        </div>
+        <div style={s.signCol}>
+          <div>Employee Signature</div>
+          <div style={s.signLine} />
+        </div>
       </div>
     </div>
   );
@@ -174,89 +131,33 @@ const s = {
   sheet: {
     position: 'relative',
     width: '794px',
-    minHeight: '1123px',
+    minHeight: '561px',
     backgroundColor: '#FFFFFF',
     color: COLORS.text,
-    fontFamily: "'Segoe UI', 'DejaVu Sans', Arial, sans-serif",
-    fontSize: '13px',
-    lineHeight: 1.45,
-    display: 'flex',
-    flexDirection: 'column',
+    fontFamily: "Arial, 'Helvetica Neue', 'DejaVu Sans', sans-serif",
+    fontSize: '12.5px',
+    lineHeight: 1.4,
     boxSizing: 'border-box',
+    padding: '26px 48px 22px',
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact'
   },
-  frame: {
-    position: 'absolute',
-    top: '14px',
-    left: '14px',
-    right: '14px',
-    bottom: '14px',
-    border: `1.5px solid ${COLORS.navy}`,
-    pointerEvents: 'none'
-  },
-  header: {
-    padding: '34px 56px 14px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  logo: { height: '62px', maxWidth: '180px', objectFit: 'contain' },
-  rule: {
-    margin: '0 56px',
-    borderTop: `1.5px solid ${COLORS.navy}`,
-    borderBottom: `3px solid ${COLORS.gold}`,
-    height: '4px',
-    boxSizing: 'content-box'
-  },
-  heading: { color: COLORS.navy, fontSize: '34px', fontWeight: 800, letterSpacing: '1px', lineHeight: 1.1 },
-  headerSub: { color: '#A9834F', fontWeight: 700, fontSize: '14px', marginTop: '8px' },
-  body: { padding: '20px 56px 16px', flex: 1 },
-  metaRow: { display: 'flex', border: `1px solid ${COLORS.navy}`, marginBottom: '20px' },
-  metaCell: { flex: 1, padding: '9px 12px', borderRight: `1px solid ${COLORS.border}` },
-  metaLabel: { fontSize: '10.5px', fontWeight: 700, color: COLORS.muted, letterSpacing: '0.4px', marginBottom: '4px' },
-  metaSub: { fontSize: '11.5px', color: COLORS.muted },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    backgroundColor: COLORS.head,
-    color: COLORS.navy,
-    fontSize: '11.5px',
-    fontWeight: 700,
-    padding: '10px 12px',
-    border: `1px solid ${COLORS.navy}`
-  },
-  td: { padding: '9px 12px', border: `1px solid ${COLORS.border}` },
-  netBox: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginTop: '18px',
-    padding: '14px 16px',
-    backgroundColor: COLORS.soft,
-    border: `2px solid ${COLORS.navy}`,
-    color: COLORS.navy,
-    fontWeight: 800,
-    fontSize: '16px'
-  },
-  wordsBox: { border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.panel, padding: '10px 12px', marginTop: '10px' },
-  employerBox: { marginTop: '10px', fontSize: '11.5px', color: COLORS.muted },
-  noteBox: {
-    marginTop: '14px',
-    padding: '10px 12px',
-    backgroundColor: COLORS.soft,
-    border: `1px solid ${COLORS.gold}`,
-    color: COLORS.muted,
-    fontSize: '11.5px'
-  },
-  signRow: { display: 'flex', border: `1px solid ${COLORS.border}`, marginTop: '28px' },
-  signCol: { flex: 1, padding: '14px 12px 12px' },
-  footer: {
-    margin: '0 56px',
-    padding: '10px 0 26px',
-    borderTop: `1.5px solid ${COLORS.navy}`,
-    color: COLORS.navy,
-    fontSize: '11px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '12px'
-  }
+  title: { textAlign: 'center', fontSize: '15px', textDecoration: 'underline' },
+  company: { textAlign: 'center', fontSize: '19px', fontWeight: 700, marginTop: '2px' },
+  empId: { textAlign: 'center', fontSize: '11.5px', marginBottom: '14px' },
+  meta: { display: 'flex', gap: '24px', marginBottom: '22px' },
+  metaCol: { flex: 1 },
+  metaRow: { display: 'flex', gap: '4px', lineHeight: 1.65 },
+  metaKey: { display: 'inline-block', width: '105px' },
+  table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' },
+  th: { border: `1px solid ${COLORS.line}`, padding: '4px 8px', fontSize: '15px', fontWeight: 400, textAlign: 'center' },
+  td: { border: `1px solid ${COLORS.line}`, padding: '3px 8px', height: '19px', fontSize: '12px' },
+  num: { textAlign: 'right' },
+  totalLabel: { textAlign: 'right' },
+  netLine: { textAlign: 'center', textDecoration: 'underline', marginTop: '16px', fontSize: '13px' },
+  words: { textAlign: 'center', marginTop: '3px', fontSize: '11px', color: COLORS.muted },
+  notes: { marginTop: '8px', fontSize: '11px', color: COLORS.muted },
+  signRow: { display: 'flex', justifyContent: 'space-around', gap: '40px', marginTop: '22px' },
+  signCol: { flex: 1, textAlign: 'center' },
+  signLine: { borderTop: `2px solid #cfcfcf`, marginTop: '30px' }
 };

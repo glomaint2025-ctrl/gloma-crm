@@ -142,9 +142,12 @@ export async function sheetToPageCanvases(wrapper) {
     }
 
     // Page frame (the same double border the sheet shows on screen).
-    ctx.strokeStyle = NAVY;
-    ctx.lineWidth = 1.5 * SCALE;
-    ctx.strokeRect(px(FRAME_INSET_PX), px(FRAME_INSET_PX), out.width - px(FRAME_INSET_PX * 2), out.height - px(FRAME_INSET_PX * 2));
+    // Sheets that mark themselves data-pdf-noframe (the half-page payslip) get no frame.
+    if (!wrapper.querySelector('[data-pdf-noframe]')) {
+      ctx.strokeStyle = NAVY;
+      ctx.lineWidth = 1.5 * SCALE;
+      ctx.strokeRect(px(FRAME_INSET_PX), px(FRAME_INSET_PX), out.width - px(FRAME_INSET_PX * 2), out.height - px(FRAME_INSET_PX * 2));
+    }
 
     // "Page x of y" only matters when the document has more than one page.
     if (pages.length > 1 && pageNumRel) {

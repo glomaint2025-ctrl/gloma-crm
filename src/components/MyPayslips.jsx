@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, Receipt } from 'lucide-react';
 import { supabase } from '../supabaseClient';
@@ -101,7 +101,7 @@ export default function MyPayslips({ currentUserProfile = {} }) {
               </div>
             </div>
             <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
-              <div style={{ width: '556px', height: '786px', overflow: 'hidden' }}>
+              <div style={{ width: '556px', height: '393px', overflow: 'hidden' }}>
                 <div style={{ width: '794px', transform: 'scale(0.7)', transformOrigin: 'top left' }}>
                   <PayslipSheet run={viewing} employee={employee} />
                 </div>

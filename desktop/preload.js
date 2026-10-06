@@ -8,6 +8,12 @@ contextBridge.exposeInMainWorld('glomaDesktop', {
   getVersion: () => ipcRenderer.invoke('gloma:get-version'),
   checkForUpdates: () => ipcRenderer.invoke('gloma:check-updates'),
   installUpdate: () => ipcRenderer.send('gloma:install-update'),
+  // Fires when the PC shuts down, logs off or goes to sleep; returns an unsubscribe function.
+  onPcOff: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('gloma:pc-off', handler);
+    return () => ipcRenderer.removeListener('gloma:pc-off', handler);
+  },
   // Subscribe to update progress; returns an unsubscribe function.
   onUpdateStatus: (callback) => {
     const handler = (_event, payload) => callback(payload);

@@ -18,6 +18,7 @@ import ClockReminder from './components/ClockReminder';
 import UpdateBanner from './components/UpdateBanner';
 import DesktopUpdate from './components/DesktopUpdate';
 import MyPayslips from './components/MyPayslips';
+import Letters from './components/Letters';
 import { splitWorkedMinutes, isHoliday, getClosingTime, todayStr, OFFICE_OPEN_TIME } from './workHours';
 
 import {
@@ -38,7 +39,8 @@ import {
   Clock,
   Wallet,
   FileText,
-  Receipt
+  Receipt,
+  Mail
 } from 'lucide-react';
 
 const sidebarTranslations = {
@@ -264,6 +266,59 @@ export default function App() {
     const interval = setInterval(syncClock, 60000);
     return () => clearInterval(interval);
   }, [loading, currentUserProfile?.id]);
+
+  // Stop the work timer automatically when the PC is turned off (or sleeps):
+  //  - while the app runs it writes an "alive" timestamp every 15 s; if the app starts (or
+  //    wakes up) and finds the timestamp is stale while a timer is still open, the PC was
+  //    off, so the session is closed at that last alive time;
+  //  - the desktop app also reports shutdown / sleep right away so the timer stops at once.
+  const handleClockOutRef = useRef(null);
+  const aliveKey = currentUserProfile?.id ? `gloma_alive_${currentUserProfile.id}` : '';
+
+  useEffect(() => {
+    if (loading || !aliveKey) return;
+    const userId = currentUserProfile.id;
+    const GAP_MS = 5 * 60 * 1000;
+
+    const readAlive = () => {
+      try { return Number(localStorage.getItem(aliveKey)) || 0; } catch { return 0; }
+    };
+    const writeAlive = (ms) => {
+      try { localStorage.setItem(aliveKey, String(ms)); } catch { /* storage blocked: skip */ }
+    };
+    const openLog = () => timeLogsRef.current.find(l => l.user_id === userId && !l.clock_out);
+
+    const stopAt = async (atMs) => {
+      const log = openLog();
+      if (!log || !handleClockOutRef.current) return;
+      await handleClockOutRef.current(log.id, new Date(atMs).toISOString());
+    };
+
+    const tick = async () => {
+      const last = readAlive();
+      const now = Date.now();
+      if (last && now - last > GAP_MS) {
+        // The app was not running for a while: the PC was off or asleep.
+        writeAlive(now);
+        const log = openLog();
+        if (log && last > new Date(log.clock_in).getTime()) await stopAt(last);
+        return;
+      }
+      writeAlive(now);
+    };
+
+    tick();
+    const interval = setInterval(tick, 15000);
+
+    let offDesktop;
+    if (window.glomaDesktop && window.glomaDesktop.onPcOff) {
+      offDesktop = window.glomaDesktop.onPcOff(() => { stopAt(Date.now()); });
+    }
+    return () => {
+      clearInterval(interval);
+      if (offDesktop) offDesktop();
+    };
+  }, [loading, aliveKey]);
 
   const applyVisualSettings = (settings) => {
     if (!settings) return;
@@ -738,11 +793,14 @@ export default function App() {
     }
   };
 
-  const handleClockOut = async (logId) => {
+  // atISO lets the PC-off recovery close a session at the moment the PC went off
+  // instead of "now".
+  const handleClockOut = async (logId, atISO) => {
     const log = timeLogs.find(l => l.id === logId);
     if (!log) return;
 
-    const clockOutISO = new Date().toISOString();
+    let clockOutISO = typeof atISO === 'string' ? atISO : new Date().toISOString();
+    if (new Date(clockOutISO) < new Date(log.clock_in)) clockOutISO = log.clock_in;
     const { regularMinutes, overtimeMinutes } = splitWorkedMinutes(log.clock_in, clockOutISO, log.work_date);
 
     try {
@@ -783,6 +841,8 @@ export default function App() {
     setActiveView(view);
     setMobileNavOpen(false);
   };
+
+  handleClockOutRef.current = handleClockOut;
 
   if (loading) {
     return (
@@ -913,6 +973,16 @@ export default function App() {
               className={`nav-btn ${activeView === 'invoices' ? 'active' : ''}`}
             >
               <FileText size={18} /> {sbT.invoices}
+            </button>
+          )}
+
+          {/* Letters & letterheads: same finance roles */}
+          {['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(currentUserProfile?.role) && (
+            <button
+              onClick={() => navTo('letters')}
+              className={`nav-btn ${activeView === 'letters' ? 'active' : ''}`}
+            >
+              <Mail size={18} /> {sbT.letters || 'Letters'}
             </button>
           )}
 
@@ -1096,6 +1166,10 @@ export default function App() {
             onSaveInvoice={handleSaveInvoice}
             onDeleteInvoice={handleDeleteInvoice}
           />
+        )}
+
+        {activeView === 'letters' && (
+          <Letters currentUserProfile={currentUserProfile} />
         )}
 
         {activeView === 'team' && (
