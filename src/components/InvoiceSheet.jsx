@@ -174,16 +174,10 @@ export default function InvoiceSheet({ doc }) {
             <div data-pdf-keep="true" style={s.sectionTitle}>{t.bankTitle}</div>
             <table style={s.bankTable}>
               <tbody>
-                {[
-                  [t.bankMethodLabel, t.bankMethod],
-                  [t.bankNameLabel, t.bankName],
-                  [t.bankAccountNameLabel, t.bankAccountName],
-                  [t.bankAccountNumberLabel, t.bankAccountNumber],
-                  [t.bankBranchLabel, t.bankBranch]
-                ].map(([label, value], idx) => (
+                {t.bankRows.map((row, idx) => (
                   <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#FFFFFF' : COLORS.panel }}>
-                    <td style={s.bankLabel}>{label}</td>
-                    <td style={s.bankValue}>{value}</td>
+                    <td style={s.bankLabel}>{row.label}</td>
+                    <td style={{ ...s.bankValue, whiteSpace: 'pre-line' }}>{row.value}</td>
                   </tr>
                 ))}
               </tbody>

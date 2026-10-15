@@ -186,19 +186,9 @@ export const SHEET_TEXT_GROUPS = [
     ]
   },
   {
-    title: 'Bank details',
+    title: 'Payment section heading',
     fields: [
-      { key: 'bankTitle', label: 'Section title' },
-      { key: 'bankMethodLabel', label: 'Method label' },
-      { key: 'bankMethod', label: 'Method' },
-      { key: 'bankNameLabel', label: 'Bank name label' },
-      { key: 'bankName', label: 'Bank name' },
-      { key: 'bankAccountNameLabel', label: 'Account name label' },
-      { key: 'bankAccountName', label: 'Account name' },
-      { key: 'bankAccountNumberLabel', label: 'Account number label' },
-      { key: 'bankAccountNumber', label: 'Account number' },
-      { key: 'bankBranchLabel', label: 'Branch label' },
-      { key: 'bankBranch', label: 'Branch' }
+      { key: 'bankTitle', label: 'Section title' }
     ]
   },
   {
@@ -267,9 +257,20 @@ export function resolveSheetText(doc, useCustom = true) {
     footer: `${COMPANY_PROFILE.name}  |  ${COMPANY_PROFILE.website}  |  ${COMPANY_PROFILE.email}  |  ${doc.doc_number}`
   };
   const text = {};
+  const defaultBankRows = [
+    { label: defaults.bankMethodLabel, value: defaults.bankMethod },
+    { label: defaults.bankNameLabel, value: defaults.bankName },
+    { label: defaults.bankAccountNameLabel, value: defaults.bankAccountName },
+    { label: defaults.bankAccountNumberLabel, value: defaults.bankAccountNumber },
+    { label: defaults.bankBranchLabel, value: defaults.bankBranch }
+  ];
   for (const key of Object.keys(defaults)) {
     const override = custom[key];
     text[key] = typeof override === 'string' && override.trim() !== '' ? override : defaults[key];
   }
+  const customRows = Array.isArray(custom.bankRows)
+    ? custom.bankRows.filter(row => row && ((row.label || '').trim() || (row.value || '').trim()))
+    : [];
+  text.bankRows = customRows.length ? customRows : defaultBankRows;
   return text;
 }

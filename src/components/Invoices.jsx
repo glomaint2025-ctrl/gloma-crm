@@ -10,6 +10,9 @@ import {
   Copy,
   ArrowRightCircle,
   Eye,
+  Landmark,
+  ArrowUp,
+  ArrowDown,
   SlidersHorizontal,
   ShieldAlert,
   AlertTriangle
@@ -229,6 +232,27 @@ export default function Invoices({
     });
   };
 
+  const defaultText = form ? resolveSheetText(form, false) : {};
+
+  // Payment method & bank details rows. The first edit copies the standard rows into the
+  // document so they can be changed, added to, reordered or removed.
+  const bankRows = form?.custom?.bankRows?.length ? form.custom.bankRows : defaultText.bankRows;
+  const writeBankRows = (rows) => setForm(prev => ({ ...prev, custom: { ...(prev.custom || {}), bankRows: rows } }));
+  const updateBankRow = (index, key, value) => writeBankRows(bankRows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
+  const addBankRow = () => writeBankRows([...bankRows, { label: '', value: '' }]);
+  const removeBankRow = (index) => {
+    const next = bankRows.filter((_, i) => i !== index);
+    if (next.length) writeBankRows(next);
+    else setCustom('bankRows', undefined);
+  };
+  const moveBankRow = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= bankRows.length) return;
+    const next = [...bankRows];
+    [next[index], next[target]] = [next[target], next[index]];
+    writeBankRows(next);
+  };
+
   const updateItem = (index, key, value) => {
     setForm(prev => ({
       ...prev,
@@ -366,7 +390,6 @@ export default function Invoices({
   };
 
   const totals = form ? calcTotals(form) : null;
-  const defaultText = form ? resolveSheetText(form, false) : {};
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="animate-fade-in">
@@ -755,6 +778,79 @@ export default function Invoices({
                   <textarea rows={3} className="form-input" style={{ resize: 'vertical' }} value={form.notes} onChange={(e) => setField('notes', e.target.value)} />
                 </div>
 
+                <div style={s.helperBox}>
+                  <div style={{ ...s.helperTitle, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Landmark size={15} color="var(--color-gold)" /> Payment method &amp; bank details
+                    </span>
+                    <label style={{ ...s.toggleLabel, fontWeight: 400 }}>
+                      <input
+                        type="checkbox"
+                        checked={!!form.custom?.hideBank}
+                        onChange={(e) => setCustom('hideBank', e.target.checked)}
+                      />
+                      Hide this section
+                    </label>
+                  </div>
+                  <div style={s.customHint}>
+                    Edit the payment details printed on this document. Add, remove or reorder rows (for example a second
+                    bank account or a note). Changes apply to the preview, print and PDF only.
+                  </div>
+                  <label style={s.label}>Section heading</label>
+                  <input
+                    className="form-input"
+                    placeholder={defaultText.bankTitle}
+                    value={form.custom?.bankTitle || ''}
+                    onChange={(e) => setCustom('bankTitle', e.target.value)}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                    {bankRows.map((row, index) => (
+                      <div key={index} style={s.row}>
+                        <div style={{ ...s.col, flex: 1 }}>
+                          <input
+                            className="form-input"
+                            placeholder="Label (e.g. Bank Name)"
+                            value={row.label}
+                            onChange={(e) => updateBankRow(index, 'label', e.target.value)}
+                          />
+                        </div>
+                        <div style={{ ...s.col, flex: 2 }}>
+                          <input
+                            className="form-input"
+                            placeholder="Value"
+                            value={row.value}
+                            onChange={(e) => updateBankRow(index, 'value', e.target.value)}
+                          />
+                        </div>
+                        <button type="button" style={s.iconBtn} title="Move up" disabled={index === 0} onClick={() => moveBankRow(index, -1)}>
+                          <ArrowUp size={14} color="var(--color-text-secondary)" />
+                        </button>
+                        <button type="button" style={s.iconBtn} title="Move down" disabled={index === bankRows.length - 1} onClick={() => moveBankRow(index, 1)}>
+                          <ArrowDown size={14} color="var(--color-text-secondary)" />
+                        </button>
+                        <button type="button" style={s.iconBtn} title="Remove row" onClick={() => removeBankRow(index)}>
+                          <Trash2 size={14} color="var(--color-cancelled)" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+                    <button type="button" className="btn-secondary" onClick={addBankRow}><Plus size={14} /> Add row</button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setForm(prev => {
+                        const custom = { ...(prev.custom || {}) };
+                        delete custom.bankRows;
+                        delete custom.bankTitle;
+                        return { ...prev, custom };
+                      })}
+                    >
+                      Reset to standard bank details
+                    </button>
+                  </div>
+                </div>
+
                 <details style={s.customBox}>
                   <summary style={s.customSummary}>
                     <SlidersHorizontal size={14} /> Customize printed text (headings, company, bank, signatures, footer)
@@ -765,7 +861,7 @@ export default function Invoices({
                   </div>
 
                   <div style={s.toggleRow}>
-                    {SHEET_TOGGLES.map(toggle => (
+                    {SHEET_TOGGLES.filter(toggle => toggle.key !== 'hideBank').map(toggle => (
                       <label key={toggle.key} style={s.toggleLabel}>
                         <input
                           type="checkbox"
