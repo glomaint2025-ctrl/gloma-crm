@@ -144,3 +144,132 @@ export function formatLongDate(dateStr) {
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
+
+// Text printed on the invoice sheet. Every value can be overridden per document through
+// `doc.custom` (edited in the "Customize printed text" panel). Overrides only affect the
+// preview, print and PDF output; they are not saved to the database.
+export const SHEET_TEXT_GROUPS = [
+  {
+    title: 'Heading & details',
+    fields: [
+      { key: 'heading', label: 'Document heading' },
+      { key: 'numberLabel', label: 'Number label' },
+      { key: 'dateLabel', label: 'Date label' },
+      { key: 'dueLabel', label: 'Due date label' },
+      { key: 'periodLabel', label: 'Service period label' }
+    ]
+  },
+  {
+    title: 'Parties',
+    fields: [
+      { key: 'issuedByTitle', label: '"Issued by" title' },
+      { key: 'issuedBy', label: 'Issued by (company details)', multiline: true },
+      { key: 'issuedToTitle', label: '"Issued to" title' }
+    ]
+  },
+  {
+    title: 'Pricing table',
+    fields: [
+      { key: 'pricingTitle', label: 'Section title' },
+      { key: 'descHeader', label: 'Description column' },
+      { key: 'qtyHeader', label: 'Qty column' },
+      { key: 'unitHeader', label: 'Unit price column' },
+      { key: 'amountHeader', label: 'Amount column' },
+      { key: 'subtotalLabel', label: 'Subtotal label' },
+      { key: 'discountLabel', label: 'Discount label' },
+      { key: 'vatLabel', label: 'VAT label' },
+      { key: 'totalLabel', label: 'Total label' },
+      { key: 'advanceLabel', label: 'Advance label' },
+      { key: 'balanceLabel', label: 'Balance label' },
+      { key: 'wordsLabel', label: 'Amount in words label' },
+      { key: 'wordsText', label: 'Amount in words text' }
+    ]
+  },
+  {
+    title: 'Bank details',
+    fields: [
+      { key: 'bankTitle', label: 'Section title' },
+      { key: 'bankMethodLabel', label: 'Method label' },
+      { key: 'bankMethod', label: 'Method' },
+      { key: 'bankNameLabel', label: 'Bank name label' },
+      { key: 'bankName', label: 'Bank name' },
+      { key: 'bankAccountNameLabel', label: 'Account name label' },
+      { key: 'bankAccountName', label: 'Account name' },
+      { key: 'bankAccountNumberLabel', label: 'Account number label' },
+      { key: 'bankAccountNumber', label: 'Account number' },
+      { key: 'bankBranchLabel', label: 'Branch label' },
+      { key: 'bankBranch', label: 'Branch' }
+    ]
+  },
+  {
+    title: 'Signatures & footer',
+    fields: [
+      { key: 'signLeft', label: 'Left signature block', multiline: true },
+      { key: 'signRight', label: 'Right signature block', multiline: true },
+      { key: 'footer', label: 'Footer text' }
+    ]
+  }
+];
+
+export const SHEET_TOGGLES = [
+  { key: 'hideWords', label: 'Hide "Amount in words"' },
+  { key: 'hideBank', label: 'Hide bank details' },
+  { key: 'hideSignatures', label: 'Hide signature block' }
+];
+
+// Resolves every printed string for a document: the built-in default, or the override.
+export function resolveSheetText(doc, useCustom = true) {
+  const custom = (useCustom && doc.custom) || {};
+  const typeConfig = DOC_TYPES[doc.doc_type] || DOC_TYPES.Invoice;
+  const totals = calcTotals(doc);
+  const bank = COMPANY_PROFILE.bank;
+  const defaults = {
+    heading: typeConfig.heading,
+    numberLabel: typeConfig.numberLabel,
+    dateLabel: 'DATE',
+    dueLabel: 'DUE DATE',
+    periodLabel: 'SERVICE PERIOD',
+    issuedByTitle: 'ISSUED BY',
+    issuedBy: [
+      COMPANY_PROFILE.name,
+      ...COMPANY_PROFILE.addressLines,
+      `Phone: ${COMPANY_PROFILE.phone}`,
+      `Email: ${COMPANY_PROFILE.email}`,
+      COMPANY_PROFILE.vatNumber ? `VAT No: ${COMPANY_PROFILE.vatNumber}` : ''
+    ].filter(Boolean).join('\n'),
+    issuedToTitle: 'ISSUED TO',
+    pricingTitle: 'PRICING & PACKAGE STRUCTURE',
+    descHeader: 'DESCRIPTION',
+    qtyHeader: 'QTY',
+    unitHeader: 'UNIT PRICE',
+    amountHeader: 'AMOUNT (LKR)',
+    subtotalLabel: 'Subtotal',
+    discountLabel: 'Discount',
+    vatLabel: `VAT (${Number(doc.tax_rate) || 0}%)`,
+    totalLabel: typeConfig.totalLabel,
+    advanceLabel: 'Less: Advance received',
+    balanceLabel: 'Balance Due',
+    wordsLabel: 'Amount in Words:',
+    wordsText: amountInWords(totals.advance > 0 ? totals.balance : totals.total),
+    bankTitle: 'PAYMENT METHOD & BANK DETAILS',
+    bankMethodLabel: 'Payment Method',
+    bankMethod: bank.method,
+    bankNameLabel: 'Bank Name',
+    bankName: bank.bankName,
+    bankAccountNameLabel: 'Account Name',
+    bankAccountName: bank.accountName,
+    bankAccountNumberLabel: 'Account Number',
+    bankAccountNumber: bank.accountNumber,
+    bankBranchLabel: 'Branch',
+    bankBranch: bank.branch,
+    signLeft: `Authorized By\n${COMPANY_PROFILE.authorizedByTitle}\n${COMPANY_PROFILE.name}`,
+    signRight: 'Client Approval\nName: ___________________________\nSignature: ________________________',
+    footer: `${COMPANY_PROFILE.name}  |  ${COMPANY_PROFILE.website}  |  ${COMPANY_PROFILE.email}  |  ${doc.doc_number}`
+  };
+  const text = {};
+  for (const key of Object.keys(defaults)) {
+    const override = custom[key];
+    text[key] = typeof override === 'string' && override.trim() !== '' ? override : defaults[key];
+  }
+  return text;
+}

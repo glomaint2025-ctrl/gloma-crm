@@ -10,6 +10,7 @@ import {
   Copy,
   ArrowRightCircle,
   Eye,
+  SlidersHorizontal,
   ShieldAlert,
   AlertTriangle
 } from 'lucide-react';
@@ -20,6 +21,9 @@ import {
   DOC_TYPES,
   DOC_STATUSES,
   nextDocNumber,
+  SHEET_TEXT_GROUPS,
+  SHEET_TOGGLES,
+  resolveSheetText,
   calcTotals,
   formatMoney
 } from '../invoiceUtils';
@@ -92,6 +96,7 @@ function buildBlankForm(docType, existingDocs, createdBy) {
     tax_rate: '',
     advance_paid: '',
     notes: config.defaultNotes,
+    custom: {},
     created_by: createdBy
   };
 }
@@ -105,7 +110,8 @@ function docToForm(doc) {
     items: Array.isArray(doc.items) && doc.items.length ? doc.items : [blankItem()],
     discount: doc.discount || '',
     tax_rate: doc.tax_rate || '',
-    advance_paid: doc.advance_paid || ''
+    advance_paid: doc.advance_paid || '',
+    custom: {}
   };
 }
 
@@ -211,6 +217,16 @@ export default function Invoices({
       client_contact_person: client.contact_person || '',
       client_contact: [client.contact_number, client.contact_email].filter(Boolean).join(' | ')
     }));
+  };
+
+  // Print-only overrides for any text on the sheet (never saved to the database).
+  const setCustom = (key, value) => {
+    setForm(prev => {
+      const custom = { ...(prev.custom || {}) };
+      if (value === '' || value === false || value === undefined) delete custom[key];
+      else custom[key] = value;
+      return { ...prev, custom };
+    });
   };
 
   const updateItem = (index, key, value) => {
@@ -350,6 +366,7 @@ export default function Invoices({
   };
 
   const totals = form ? calcTotals(form) : null;
+  const defaultText = form ? resolveSheetText(form, false) : {};
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="animate-fade-in">
@@ -507,6 +524,13 @@ export default function Invoices({
                 />
                 <button className="btn-secondary" onClick={() => window.print()}>
                   <Printer size={15} /> Print
+                </button>
+                <button
+                  className="btn-secondary"
+                  title="Change anything on the invoice before printing or downloading"
+                  onClick={() => { const doc = viewingDoc; setViewingDoc(null); openEditor(docToForm(doc)); }}
+                >
+                  <SlidersHorizontal size={15} /> Edit before print
                 </button>
                 <button className="btn-secondary" onClick={() => setViewingDoc(null)}>Close</button>
               </div>
@@ -731,6 +755,81 @@ export default function Invoices({
                   <textarea rows={3} className="form-input" style={{ resize: 'vertical' }} value={form.notes} onChange={(e) => setField('notes', e.target.value)} />
                 </div>
 
+                <details style={s.customBox}>
+                  <summary style={s.customSummary}>
+                    <SlidersHorizontal size={14} /> Customize printed text (headings, company, bank, signatures, footer)
+                  </summary>
+                  <div style={s.customHint}>
+                    Change any wording on this document before you print or download it. Leave a field empty to use the
+                    standard text. These changes apply to the preview, print and PDF only and are not saved.
+                  </div>
+
+                  <div style={s.toggleRow}>
+                    {SHEET_TOGGLES.map(toggle => (
+                      <label key={toggle.key} style={s.toggleLabel}>
+                        <input
+                          type="checkbox"
+                          checked={!!form.custom?.[toggle.key]}
+                          onChange={(e) => setCustom(toggle.key, e.target.checked)}
+                        />
+                        {toggle.label}
+                      </label>
+                    ))}
+                    <label style={s.toggleLabel}>
+                      Qty / unit price columns
+                      <select
+                        className="form-input"
+                        style={{ width: 'auto', padding: '4px 8px' }}
+                        value={form.custom?.qtyColumns || ''}
+                        onChange={(e) => setCustom('qtyColumns', e.target.value)}
+                      >
+                        <option value="">Automatic</option>
+                        <option value="show">Always show</option>
+                        <option value="hide">Always hide</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  {SHEET_TEXT_GROUPS.map(group => (
+                    <div key={group.title}>
+                      <div style={s.customGroup}>{group.title}</div>
+                      <div style={s.customGrid}>
+                        {group.fields.map(field => (
+                          <div key={field.key} style={field.multiline ? { gridColumn: '1 / -1' } : undefined}>
+                            <label style={s.label}>{field.label}</label>
+                            {field.multiline ? (
+                              <textarea
+                                rows={4}
+                                className="form-input"
+                                style={{ resize: 'vertical' }}
+                                placeholder={defaultText[field.key]}
+                                value={form.custom?.[field.key] || ''}
+                                onChange={(e) => setCustom(field.key, e.target.value)}
+                              />
+                            ) : (
+                              <input
+                                className="form-input"
+                                placeholder={defaultText[field.key]}
+                                value={form.custom?.[field.key] || ''}
+                                onChange={(e) => setCustom(field.key, e.target.value)}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ marginTop: '12px' }}
+                    onClick={() => setField('custom', {})}
+                  >
+                    Reset to standard text
+                  </button>
+                </details>
+
                 <div style={s.totalsBox}>
                   <div>Subtotal: <strong>{formatMoney(totals.subtotal)}</strong></div>
                   {totals.discountAmount > 0 && <div>Discount: <strong>- {formatMoney(totals.discountAmount)}</strong></div>}
@@ -814,5 +913,12 @@ const s = {
   helperTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, marginBottom: '8px' },
   totalsBox: { display: 'flex', gap: '18px', flexWrap: 'wrap', padding: '10px 12px', backgroundColor: 'rgba(212,175,55,0.08)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)' },
   formError: { color: 'var(--color-cancelled)', fontSize: 'var(--font-size-sm)', padding: '8px 12px', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-sm)' },
+  customBox: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '10px 12px' },
+  customSummary: { cursor: 'pointer', fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--color-gold)', display: 'flex', alignItems: 'center', gap: '8px' },
+  customHint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', margin: '10px 0' },
+  customGroup: { fontSize: 'var(--font-size-sm)', fontWeight: 700, margin: '14px 0 8px' },
+  customGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' },
+  toggleRow: { display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', fontSize: 'var(--font-size-sm)' },
+  toggleLabel: { display: 'flex', alignItems: 'center', gap: '6px' },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }
 };
