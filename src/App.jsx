@@ -703,8 +703,15 @@ export default function App() {
 
   const handleSaveUpdate = async (updateObj) => {
     try {
-      await supabase.from('daily_updates').insert(updateObj);
-      
+      let { error: insertError } = await supabase.from('daily_updates').insert(updateObj);
+      // Before supabase_add_eod_report_types.sql is run the report columns do not exist:
+      // save the update without them (the readable summary is already in work_completed).
+      if (insertError && /report_type|report_data/i.test(insertError.message || '')) {
+        const { report_type: _type, report_data: _data, ...plainUpdate } = updateObj;
+        ({ error: insertError } = await supabase.from('daily_updates').insert(plainUpdate));
+      }
+      if (insertError) return { success: false, error: insertError.message };
+
       // Update corresponding task details automatically
       if (updateObj.task_id) {
         const associatedTask = tasks.find(t => t.id === updateObj.task_id);
@@ -723,8 +730,10 @@ export default function App() {
       }
       
       await refreshData();
+      return { success: true };
     } catch (err) {
       console.error(err);
+      return { success: false, error: err.message };
     }
   };
 

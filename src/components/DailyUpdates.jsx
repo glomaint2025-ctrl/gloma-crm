@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
 import { Calendar, User, BookOpen, Clock, FileText, Send, Trash2, ShieldAlert } from 'lucide-react';
+import {
+  REPORT_TYPES,
+  defaultReportType,
+  reportTypeOf,
+  metricsSummary,
+  cleanMetrics
+} from '../eodReports';
 
 const OTHER_CLIENT = '__other';
 
@@ -26,13 +33,23 @@ export default function DailyUpdates({
   const [nextStep, setNextStep] = useState('');
   const [blockers, setBlockers] = useState('');
   const [evidenceLink, setEvidenceLink] = useState('');
+  const [reportType, setReportType] = useState(defaultReportType(currentUserProfile?.role));
+  const [metrics, setMetrics] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   // Filtering states
+  const [filterType, setFilterType] = useState('');
+  const [filterDate, setFilterDate] = useState('');
   const [filterEmployee, setFilterEmployee] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   const userRole = currentUserProfile?.role || 'Employee';
   const isAdminOrDev = userRole === 'Developer' || userRole === 'Admin';
+
+  const reportConfig = REPORT_TYPES[reportType];
+  const hasMetrics = reportConfig.fields.length > 0;
+  // Marketing and accountant reports are number-based; they have no task, client or status.
+  const usesTaskFields = reportType === 'general' || reportType === 'developer' || reportType === 'smm_developer';
 
   // Get active tasks that are assigned to the current employee (or all active tasks if admin/dev)
   const myTasksList = tasks.filter(t => {
@@ -81,40 +98,77 @@ export default function DailyUpdates({
     }
   };
 
-  const handleSubmit = (e) => {
+  const switchReportType = (type) => {
+    setReportType(type);
+    setMetrics({});
+    if (type === 'marketing' || type === 'accountant') {
+      setTaskId('');
+      setClientProject('');
+      setIsOtherClient(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!workCompleted.trim()) {
+    const cleanedMetrics = cleanMetrics(reportType, metrics);
+    const hasNumbers = Object.keys(cleanedMetrics).length > 0;
+    if (hasMetrics && !usesTaskFields && !hasNumbers) {
+      alert('Please fill in at least one number for your report.');
+      return;
+    }
+    if (!hasMetrics && !workCompleted.trim()) {
       alert('Please describe what you completed today!');
       return;
     }
+    if (hasMetrics && usesTaskFields && !hasNumbers && !workCompleted.trim()) {
+      alert('Please fill in your numbers or describe what you completed today.');
+      return;
+    }
 
-    if (isOtherClient && !clientProject.trim()) {
+    if (usesTaskFields && isOtherClient && !clientProject.trim()) {
       alert('Please type the client or project name.');
       return;
     }
 
     const totalMinutes = (parseInt(hoursPart, 10) || 0) * 60 + (parseInt(minutesPart, 10) || 0);
     const matchedTask = tasks.find(t => t.id === taskId);
+
+    // Number-based reports keep a readable summary in work_completed as well.
+    const summaryText = metricsSummary(reportType, cleanedMetrics);
+    const fullText = hasMetrics
+      ? [`${reportConfig.label} report`, summaryText, workCompleted.trim() ? `Notes: ${workCompleted.trim()}` : ''].filter(Boolean).join('\n')
+      : workCompleted;
     
     // Package update
     const updateObj = {
       date,
       employee_id: currentUserProfile.id,
       employee_name: currentUserProfile.full_name,
-      task_id: taskId || null,
-      client_project: clientProject.trim() || (matchedTask ? matchedTask.client_project : 'Gloma General'),
-      work_completed: workCompleted,
+      task_id: usesTaskFields ? (taskId || null) : null,
+      client_project: usesTaskFields
+        ? (clientProject.trim() || (matchedTask ? matchedTask.client_project : 'Gloma General'))
+        : 'Gloma General',
+      work_completed: fullText,
       hours_spent: Math.round((totalMinutes / 60) * 100) / 100,
-      status_at_end: statusAtEnd,
+      status_at_end: usesTaskFields ? statusAtEnd : 'Delivered',
       next_step: nextStep,
       blockers: blockers,
-      evidence_link: evidenceLink
+      evidence_link: evidenceLink,
+      report_type: reportType,
+      report_data: hasMetrics ? cleanedMetrics : null
     };
 
-    onSaveUpdate(updateObj);
+    setSubmitting(true);
+    const result = await onSaveUpdate(updateObj);
+    setSubmitting(false);
+    if (result && result.success === false) {
+      alert(`Could not submit your update: ${result.error || 'unknown error'}`);
+      return;
+    }
 
     // Reset Form
+    setMetrics({});
     setTaskId('');
     setClientProject('');
     setWorkCompleted('');
@@ -129,14 +183,24 @@ export default function DailyUpdates({
 
   // Filter Updates
   const filteredUpdates = updates.filter(upd => {
+    const matchesType = !filterType || reportTypeOf(upd) === filterType;
+    const matchesDate = !filterDate || String(upd.date).substring(0, 10) === filterDate;
     const matchesEmployee = !filterEmployee || upd.employee_id === filterEmployee || upd.employee_name === filterEmployee;
     const matchesSearch = 
       !searchQuery || 
       (upd.work_completed || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (upd.client_project || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (upd.employee_name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesEmployee && matchesSearch;
+    return matchesType && matchesDate && matchesEmployee && matchesSearch;
   });
+
+  // Totals table for the number-based reports (e.g. the marketing team's daily numbers).
+  const summaryType = filterType && REPORT_TYPES[filterType].fields.length ? filterType : '';
+  const summaryRows = summaryType ? filteredUpdates.filter(upd => upd.report_data) : [];
+  const summaryTotals = summaryType
+    ? REPORT_TYPES[summaryType].fields.map(field =>
+        summaryRows.reduce((sum, upd) => sum + (Number(upd.report_data?.[field.key]) || 0), 0))
+    : [];
 
   return (
     <div style={styles.container} className="animate-fade-in">
@@ -148,6 +212,21 @@ export default function DailyUpdates({
             <Send size={18} color="var(--color-gold)" />
             <h3 style={styles.sectionTitle}>Log Daily Work Progress</h3>
           </div>
+
+          <div style={styles.typeTabs}>
+            {Object.entries(REPORT_TYPES).map(([key, config]) => (
+              <button
+                key={key}
+                type="button"
+                className={reportType === key ? 'btn-primary' : 'btn-secondary'}
+                style={styles.typeTab}
+                onClick={() => switchReportType(key)}
+              >
+                {config.label}
+              </button>
+            ))}
+          </div>
+          <div style={styles.typeHint}>{reportConfig.hint}</div>
 
           <form onSubmit={handleSubmit} style={styles.form}>
             <div style={styles.formRow}>
@@ -196,6 +275,26 @@ export default function DailyUpdates({
               </div>
             </div>
 
+            {hasMetrics && (
+              <div style={styles.metricsGrid}>
+                {reportConfig.fields.map(field => (
+                  <div key={field.key}>
+                    <label style={styles.formLabel}>{field.label}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step={field.money ? 'any' : '1'}
+                      placeholder="0"
+                      value={metrics[field.key] ?? ''}
+                      onChange={(e) => setMetrics({ ...metrics, [field.key]: e.target.value })}
+                      className="form-input"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {usesTaskFields && (
             <div style={styles.formRow}>
               <div style={{ flex: 1 }}>
                 <label style={styles.formLabel}>Associate with Task</label>
@@ -237,11 +336,12 @@ export default function DailyUpdates({
                 )}
               </div>
             </div>
+            )}
 
             <div>
-              <label style={styles.formLabel}>Work Completed Today</label>
+              <label style={styles.formLabel}>{hasMetrics ? 'Notes (optional)' : 'Work Completed Today'}</label>
               <textarea
-                required
+                required={!hasMetrics}
                 rows={3}
                 placeholder="Describe details of work done, clips edited, designs posted..."
                 value={workCompleted}
@@ -251,6 +351,7 @@ export default function DailyUpdates({
               />
             </div>
 
+            {usesTaskFields && (
             <div style={styles.formRow}>
               <div style={{ flex: 1 }}>
                 <label style={styles.formLabel}>Next Step</label>
@@ -277,6 +378,7 @@ export default function DailyUpdates({
                 </select>
               </div>
             </div>
+            )}
 
             <div style={styles.formRow}>
               <div style={{ flex: 1 }}>
@@ -302,8 +404,8 @@ export default function DailyUpdates({
               </div>
             </div>
 
-            <button type="submit" className="btn-primary" style={styles.submitBtn}>
-              <Send size={15} /> Submit EOD Update
+            <button type="submit" className="btn-primary" style={styles.submitBtn} disabled={submitting}>
+              <Send size={15} /> {submitting ? 'Submitting...' : `Submit ${hasMetrics ? reportConfig.label + ' ' : ''}EOD Update`}
             </button>
           </form>
         </div>
@@ -338,6 +440,71 @@ export default function DailyUpdates({
             </select>
           </div>
 
+          <div style={styles.logFilters}>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              style={{ ...styles.logEmpSelect, flex: 1 }}
+              className="form-input"
+            >
+              <option value="">All report types</option>
+              {Object.entries(REPORT_TYPES).map(([key, config]) => (
+                <option key={key} value={key}>{config.label}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              style={{ ...styles.logEmpSelect, width: '150px' }}
+              className="form-input"
+              title="Show one day only"
+            />
+            {filterDate && (
+              <button type="button" className="btn-secondary" onClick={() => setFilterDate('')}>All dates</button>
+            )}
+          </div>
+
+          {summaryType && (
+            <div style={styles.summaryWrap}>
+              <div style={styles.summaryTitle}>
+                {REPORT_TYPES[summaryType].label} numbers {filterDate ? `- ${filterDate}` : '- all dates'}
+              </div>
+              {summaryRows.length === 0 ? (
+                <div style={styles.emptyLogsMessage}>No numbers reported for this selection.</div>
+              ) : (
+                <div className="table-container">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Employee</th>
+                        <th>Date</th>
+                        {REPORT_TYPES[summaryType].fields.map(field => <th key={field.key} style={{ textAlign: 'right' }}>{field.label}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summaryRows.map(upd => (
+                        <tr key={upd.id}>
+                          <td>{upd.employee_name}</td>
+                          <td>{String(upd.date).substring(0, 10)}</td>
+                          {REPORT_TYPES[summaryType].fields.map(field => (
+                            <td key={field.key} style={{ textAlign: 'right' }}>{upd.report_data?.[field.key] ?? '-'}</td>
+                          ))}
+                        </tr>
+                      ))}
+                      <tr style={{ fontWeight: 700 }}>
+                        <td colSpan={2}>Total</td>
+                        {summaryTotals.map((total, i) => (
+                          <td key={i} style={{ textAlign: 'right' }}>{total.toLocaleString('en-US', { maximumFractionDigits: 2 })}</td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={styles.logsTimeline}>
             {filteredUpdates.map((upd) => (
               <div key={upd.id} style={styles.timelineItem} className="glass-card-interactive">
@@ -363,16 +530,20 @@ export default function DailyUpdates({
                     </span>
                   )}
                   {upd.task_id && <span style={styles.taskTag}>{upd.task_id}</span>}
-                  <span className={`badge badge-${
-                    upd.status_at_end === 'Pending' ? 'pending' : 
-                    upd.status_at_end === 'In Progress' ? 'progress' :
-                    upd.status_at_end === 'Delivered' ? 'delivered' : 'hold'
-                  }`} style={{ zoom: 0.8 }}>
-                    {upd.status_at_end}
-                  </span>
+                  {REPORT_TYPES[reportTypeOf(upd)].fields.length === 0 ? (
+                    <span className={`badge badge-${
+                      upd.status_at_end === 'Pending' ? 'pending' :
+                      upd.status_at_end === 'In Progress' ? 'progress' :
+                      upd.status_at_end === 'Delivered' ? 'delivered' : 'hold'
+                    }`} style={{ zoom: 0.8 }}>
+                      {upd.status_at_end}
+                    </span>
+                  ) : (
+                    <span style={styles.typeBadge}>{REPORT_TYPES[reportTypeOf(upd)].label}</span>
+                  )}
                 </div>
 
-                <p style={styles.completedText}>{upd.work_completed}</p>
+                <p style={{ ...styles.completedText, whiteSpace: 'pre-line' }}>{upd.work_completed}</p>
 
                 {upd.next_step && (
                   <div style={styles.notesField}>
@@ -428,6 +599,13 @@ export default function DailyUpdates({
 }
 
 const styles = {
+  typeTabs: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' },
+  typeTab: { padding: '6px 12px', fontSize: 'var(--font-size-xs)' },
+  typeHint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: '14px' },
+  metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' },
+  summaryWrap: { marginBottom: '14px', overflowX: 'auto' },
+  summaryTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-gold)', marginBottom: '6px' },
+  typeBadge: { fontSize: '10px', fontWeight: 700, border: '1px solid var(--color-gold)', color: 'var(--color-gold)', borderRadius: '8px', padding: '1px 7px' },
   container: {
     display: 'flex',
     flexDirection: 'column',
