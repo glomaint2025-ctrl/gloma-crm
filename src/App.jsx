@@ -12,6 +12,7 @@ import TeamMembers from './components/TeamMembers';
 import ManageRoles from './components/ManageRoles';
 import SetupSettings from './components/SetupSettings';
 import WorkHours from './components/WorkHours';
+import AttendanceMark from './components/AttendanceMark';
 import Finance from './components/Finance';
 import Invoices from './components/Invoices';
 import ClockReminder from './components/ClockReminder';
@@ -37,6 +38,7 @@ import {
   Menu,
   X,
   Clock,
+  CalendarCheck,
   Wallet,
   FileText,
   Receipt,
@@ -52,6 +54,7 @@ const sidebarTranslations = {
     updates: "EOD Updates",
     deliveries: "Final Deliveries",
     workHours: "Work Hours",
+    attendance: "Attendance",
     finance: "Company Finance",
     invoices: "Invoices & Quotations",
     payslips: "My Payslips",
@@ -69,6 +72,7 @@ const sidebarTranslations = {
     updates: "EOD යාවත්කාලීන",
     deliveries: "භාරදීම්",
     workHours: "වැඩ කරන වේලාවන්",
+    attendance: "පැමිණීම",
     finance: "සමාගමේ ගිණුම්කරණය",
     invoices: "ඉන්වොයිස් සහ මිල ගණන්",
     payslips: "මගේ වැටුප් පත්‍රිකා",
@@ -86,6 +90,7 @@ const sidebarTranslations = {
     updates: "தினசரி புதுப்பிப்புகள்",
     deliveries: "இறுதி வழங்கல்கள்",
     workHours: "பணி நேரங்கள்",
+    attendance: "வருகைப் பதிவு",
     finance: "நிறுவன நிதி",
     invoices: "விலைப்பட்டியல்கள்",
     payslips: "எனது சம்பளச் சீட்டுகள்",
@@ -956,6 +961,14 @@ export default function App() {
             <Clock size={18} /> {sbT.workHours}
           </button>
 
+          {/* Attendance: every employee marks their own; HR/admin can add for others */}
+          <button
+            onClick={() => navTo('attendance')}
+            className={`nav-btn ${activeView === 'attendance' ? 'active' : ''}`}
+          >
+            <CalendarCheck size={18} /> {sbT.attendance}
+          </button>
+
           {/* Company Finance: Admin/Manager/Coordinator & Accountant/Developer only */}
           {['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(currentUserProfile?.role) && (
             <button
@@ -1136,6 +1149,14 @@ export default function App() {
             profiles={profiles}
             currentUserProfile={currentUserProfile}
             lang={lang}
+          />
+        )}
+
+        {activeView === 'attendance' && (
+          <AttendanceMark
+            timeLogs={timeLogs}
+            currentUserProfile={currentUserProfile}
+            onRefreshData={refreshData}
           />
         )}
 
