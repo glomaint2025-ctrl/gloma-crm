@@ -3,7 +3,6 @@
 // then matches clients and team members against what the CRM already knows.
 import { CONTENT_TYPES, PLATFORMS, parsePlatforms } from './contentCalendarUtils';
 
-const KEY_STORAGE = 'gloma_gemini_key';
 const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
 const FALLBACK_MODEL = 'gemini-flash-latest';
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -12,21 +11,18 @@ const CHUNK_CHARS = 7000;
 const MAX_CHARS = 120000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
-export const getStoredGeminiKey = () => {
-  try { return localStorage.getItem(KEY_STORAGE) || ''; } catch { return ''; }
-};
-
-export const setStoredGeminiKey = (key) => {
-  try {
-    if (key) localStorage.setItem(KEY_STORAGE, key.trim());
-    else localStorage.removeItem(KEY_STORAGE);
-  } catch { /* storage blocked: key just won't be remembered */ }
-};
-
-// A key typed into the app wins over the one baked in from .env.
-export const getGeminiKey = () => getStoredGeminiKey() || (import.meta.env.VITE_GEMINI_API_KEY || '').trim();
-
+// The team-wide key is saved by the Developer in system_settings.gemini_api_key;
+// VITE_GEMINI_API_KEY from .env is the fallback.
 export const hasEnvGeminiKey = () => !!(import.meta.env.VITE_GEMINI_API_KEY || '').trim();
+
+export const resolveGeminiKey = (sharedKey) => String(sharedKey || '').trim() || (import.meta.env.VITE_GEMINI_API_KEY || '').trim();
+
+// "AIzaSy…Ab12" - enough to recognise a key without showing it.
+export const maskKey = (key) => {
+  const value = String(key || '').trim();
+  if (!value) return '';
+  return value.length > 10 ? `${value.slice(0, 4)}…${value.slice(-4)}` : '••••••••';
+};
 
 // ---- reading files ---------------------------------------------------------
 

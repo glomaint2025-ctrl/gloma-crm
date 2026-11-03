@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Filter, Calendar as CalIcon, Plus, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Calendar as CalIcon, Plus, Sparkles, KeyRound } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { sendTaskAssignedEmail } from '../emailService';
 import MonthlyPlan from './MonthlyPlan';
 import ContentItemModal from './ContentItemModal';
 import ContentImportModal from './ContentImportModal';
+import GeminiKeyModal from './GeminiKeyModal';
 import {
   CONTENT_TYPES, PLATFORMS, contentTypeOf, parsePlatforms, platformColor, dateKeyOf, statusColor
 } from '../contentCalendarUtils';
@@ -17,7 +18,8 @@ const localTranslations = {
     filterEmployee: "All Employees",
     filterPlatform: "All Platforms",
     newContent: "New Content",
-    aiImport: "AI Sheet Import"
+    aiImport: "AI Sheet Import",
+    geminiKey: "Gemini Key"
   },
   si: {
     title: "අන්තර්ගත දින දර්ශනය",
@@ -48,6 +50,8 @@ export default function ContentCalendar({
   currentUserProfile = {},
   lang = 'en',
   monthlyPlans = [],
+  geminiKey = '',
+  onSaveGeminiKey,
   onSaveTask,
   onSaveTasks,
   onDeleteTask,
@@ -68,8 +72,10 @@ export default function ContentCalendar({
   // Editor / import modals
   const [editor, setEditor] = useState(null); // { task, date }
   const [importOpen, setImportOpen] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(false);
 
   const userRole = currentUserProfile?.role || 'Employee';
+  const isDeveloper = userRole === 'Developer';
   const hasAssignPrivilege = ['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(userRole);
 
   // Calendar calculations
@@ -290,6 +296,11 @@ export default function ContentCalendar({
             <button onClick={handleNextMonth} style={styles.pagBtn}><ChevronRight size={16} /></button>
           </div>
 
+          {isDeveloper && onSaveGeminiKey && (
+            <button type="button" className="btn-secondary" style={styles.headerBtn} onClick={() => setKeyOpen(true)} title="Gemini API key for the whole team">
+              <KeyRound size={14} /> {t.geminiKey}
+            </button>
+          )}
           <button type="button" className="btn-secondary" style={styles.headerBtn} onClick={() => setImportOpen(true)}>
             <Sparkles size={14} /> {t.aiImport}
           </button>
@@ -367,11 +378,22 @@ export default function ContentCalendar({
           currentUserProfile={currentUserProfile}
           hasAssignPrivilege={hasAssignPrivilege}
           defaultClient={defaultClient}
+          geminiKey={geminiKey}
+          isDeveloper={isDeveloper && !!onSaveGeminiKey}
           year={year}
           month={month}
           monthLabel={`${monthNames[month]} ${year}`}
           onImport={handleImport}
+          onOpenKeySettings={() => { setImportOpen(false); setKeyOpen(true); }}
           onClose={() => setImportOpen(false)}
+        />
+      )}
+
+      {keyOpen && (
+        <GeminiKeyModal
+          savedKey={geminiKey}
+          onSave={onSaveGeminiKey}
+          onClose={() => setKeyOpen(false)}
         />
       )}
     </div>

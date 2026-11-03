@@ -1,9 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Sparkles, Upload, ClipboardPaste, KeyRound, Download, ArrowLeft } from 'lucide-react';
-import {
-  extractContentItems, normalizeExtracted, readSheetFile,
-  getGeminiKey, getStoredGeminiKey, setStoredGeminiKey, hasEnvGeminiKey
-} from '../geminiImport';
+import { extractContentItems, normalizeExtracted, readSheetFile, resolveGeminiKey } from '../geminiImport';
 import { makeTaskId, workTypeFor, platformColor } from '../contentCalendarUtils';
 
 const SAMPLE_TEMPLATE = [
@@ -20,10 +17,13 @@ export default function ContentImportModal({
   currentUserProfile = {},
   hasAssignPrivilege,
   defaultClient = '',
+  geminiKey = '',
+  isDeveloper = false,
   year,
   month,
   monthLabel,
   onImport,
+  onOpenKeySettings,
   onClose
 }) {
   const fileInput = useRef(null);
@@ -32,15 +32,13 @@ export default function ContentImportModal({
   const [fileName, setFileName] = useState('');
   const [clientName, setClientName] = useState(defaultClient);
   const [defaultAssignee, setDefaultAssignee] = useState('');
-  const [keyDraft, setKeyDraft] = useState(getStoredGeminiKey());
-  const [showKey, setShowKey] = useState(!getGeminiKey());
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [rows, setRows] = useState(null);
   const [truncated, setTruncated] = useState(false);
 
-  const effectiveKey = keyDraft.trim() || getGeminiKey();
+  const effectiveKey = resolveGeminiKey(geminiKey);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -69,8 +67,7 @@ export default function ContentImportModal({
   const handleAnalyze = async () => {
     setError('');
     if (!text.trim()) { setError('Paste your content plan or upload a file first.'); return; }
-    if (!effectiveKey) { setShowKey(true); setError('Add your Gemini API key first.'); return; }
-    if (keyDraft.trim() && keyDraft.trim() !== getStoredGeminiKey()) setStoredGeminiKey(keyDraft.trim());
+    if (!effectiveKey) { setError('The Gemini API key has not been set up yet.'); return; }
 
     setBusy(true);
     setProgress('Reading your sheet with Gemini...');
@@ -181,24 +178,21 @@ export default function ContentImportModal({
                   <Upload size={14} /> Upload file
                 </button>
               </div>
-              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                <button type="button" onClick={downloadSample} style={s.linkBtn}><Download size={13} /> Sample template</button>
-                <button type="button" onClick={() => setShowKey(v => !v)} style={s.linkBtn}><KeyRound size={13} /> Gemini key</button>
-              </div>
+              <button type="button" onClick={downloadSample} style={s.linkBtn}><Download size={13} /> Sample template</button>
             </div>
 
-            {showKey && (
+            {!effectiveKey && (
               <div style={s.keyBox}>
-                <label style={s.label}>Gemini API key</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder={hasEnvGeminiKey() ? 'Using the key from the app settings (.env). Paste here to override.' : 'Paste your key from aistudio.google.com/apikey'}
-                  value={keyDraft}
-                  onChange={(e) => setKeyDraft(e.target.value)}
-                  autoComplete="off"
-                />
-                <div style={s.hint}>Saved only in this browser. For everyone on the team, set VITE_GEMINI_API_KEY in .env instead.</div>
+                <div style={{ fontSize: 'var(--font-size-sm)', marginBottom: isDeveloper ? '8px' : 0 }}>
+                  <KeyRound size={13} style={{ verticalAlign: '-2px', marginRight: '6px' }} />
+                  The Gemini API key has not been set up yet.
+                  {!isDeveloper && ' Ask the Developer to add it from the Content Calendar.'}
+                </div>
+                {isDeveloper && onOpenKeySettings && (
+                  <button type="button" className="btn-primary" style={{ padding: '6px 12px', fontSize: 'var(--font-size-sm)' }} onClick={onOpenKeySettings}>
+                    Add Gemini key
+                  </button>
+                )}
               </div>
             )}
 

@@ -587,10 +587,34 @@ export default function App() {
           .from('system_settings')
           .insert(settingsObj);
       }
-      setGlobalSettings(settingsObj);
+      setGlobalSettings(prev => ({ ...prev, ...settingsObj }));
       applyVisualSettings(settingsObj);
     } catch (err) {
       console.error('Error updating theme settings:', err);
+    }
+  };
+
+  // Developer-only: the Gemini key lives on the shared system_settings row so everyone can use it.
+  const handleSaveGeminiKey = async (key) => {
+    if (currentUserProfile?.role !== 'Developer') return { success: false, error: 'Only the Developer can change the Gemini key.' };
+    try {
+      const value = String(key || '').trim() || null;
+      const { data, error: readError } = await supabase.from('system_settings').select('*');
+      if (readError) throw readError;
+      const { error } = data && data.length > 0
+        ? await supabase.from('system_settings').update({ gemini_api_key: value }).eq('id', data[0].id)
+        : await supabase.from('system_settings').insert({ ...globalSettings, gemini_api_key: value });
+      if (error) throw error;
+      setGlobalSettings(prev => ({ ...prev, gemini_api_key: value }));
+      return { success: true };
+    } catch (err) {
+      console.error('Error saving Gemini key:', err);
+      return {
+        success: false,
+        error: /gemini_api_key|schema cache|column/i.test(err?.message || '')
+          ? 'The database is not set up for the Gemini key yet. Run supabase_add_gemini_key.sql in the Supabase SQL Editor, then try again.'
+          : err?.message
+      };
     }
   };
 
@@ -1143,6 +1167,8 @@ export default function App() {
             currentUserProfile={currentUserProfile}
             lang={lang}
             monthlyPlans={monthlyPlans}
+            geminiKey={globalSettings?.gemini_api_key || ''}
+            onSaveGeminiKey={handleSaveGeminiKey}
             onSaveTask={handleSaveTask}
             onSaveTasks={handleSaveTasks}
             onDeleteTask={handleDeleteTask}
