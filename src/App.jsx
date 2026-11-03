@@ -156,6 +156,9 @@ export default function App() {
   
   const [loading, setLoading] = useState(true);
 
+  // Whether the Gemini key exists on the server (+ masked tail for the Developer). The key itself never reaches the browser.
+  const [geminiStatus, setGeminiStatus] = useState({ configured: true, masked: '' });
+
   const lang = currentUserProfile?.language || globalSettings?.language || 'en';
   const sbT = sidebarTranslations[lang] || sidebarTranslations.en;
 
@@ -390,11 +393,23 @@ export default function App() {
         applyVisualSettings(defaults);
       }
 
+      loadGeminiStatus();
       await refreshData();
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGeminiStatus = async () => {
+    try {
+      if (typeof supabase.rpc !== 'function') return;
+      const { data, error } = await supabase.rpc('gemini_key_status');
+      // Migration not run yet: leave the import usable and let the server say what is missing.
+      if (!error && data) setGeminiStatus({ configured: !!data.configured, masked: data.masked || '' });
+    } catch (err) {
+      console.error('Could not read Gemini key status:', err);
     }
   };
 
@@ -594,26 +609,21 @@ export default function App() {
     }
   };
 
-  // Developer-only: the Gemini key lives on the shared system_settings row so everyone can use it.
+  // Developer-only: the key goes into a locked server table through set_gemini_key().
   const handleSaveGeminiKey = async (key) => {
     if (currentUserProfile?.role !== 'Developer') return { success: false, error: 'Only the Developer can change the Gemini key.' };
     try {
-      const value = String(key || '').trim() || null;
-      const { data, error: readError } = await supabase.from('system_settings').select('*');
-      if (readError) throw readError;
-      const { error } = data && data.length > 0
-        ? await supabase.from('system_settings').update({ gemini_api_key: value }).eq('id', data[0].id)
-        : await supabase.from('system_settings').insert({ ...globalSettings, gemini_api_key: value });
+      const { error } = await supabase.rpc('set_gemini_key', { new_key: String(key || '').trim() });
       if (error) throw error;
-      setGlobalSettings(prev => ({ ...prev, gemini_api_key: value }));
+      await loadGeminiStatus();
       return { success: true };
     } catch (err) {
       console.error('Error saving Gemini key:', err);
       const detail = [err?.message, err?.details, err?.hint].filter(Boolean).join(' - ') || 'Unknown error';
       return {
         success: false,
-        error: /gemini_api_key/i.test(detail)
-          ? `The database is not set up for the Gemini key yet. Run supabase_add_gemini_key.sql in the Supabase SQL Editor, then try again. (${detail})`
+        error: /set_gemini_key|schema cache|could not find the function/i.test(detail)
+          ? `The database is not set up for the Gemini key yet. Run supabase_secure_gemini_key.sql in the Supabase SQL Editor, then try again. (${detail})`
           : `Could not save the key: ${detail}`
       };
     }
@@ -1168,7 +1178,7 @@ export default function App() {
             currentUserProfile={currentUserProfile}
             lang={lang}
             monthlyPlans={monthlyPlans}
-            geminiKey={globalSettings?.gemini_api_key || ''}
+            geminiStatus={geminiStatus}
             onSaveGeminiKey={handleSaveGeminiKey}
             onSaveTask={handleSaveTask}
             onSaveTasks={handleSaveTasks}

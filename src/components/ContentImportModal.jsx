@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Sparkles, Upload, ClipboardPaste, KeyRound, Download, ArrowLeft } from 'lucide-react';
-import { extractContentItems, normalizeExtracted, readSheetFile, resolveGeminiKey } from '../geminiImport';
+import { extractContentItems, normalizeExtracted, readSheetFile } from '../geminiImport';
 import { makeTaskId, workTypeFor, platformColor } from '../contentCalendarUtils';
 
 const SAMPLE_TEMPLATE = [
@@ -17,7 +17,7 @@ export default function ContentImportModal({
   currentUserProfile = {},
   hasAssignPrivilege,
   defaultClient = '',
-  geminiKey = '',
+  keyConfigured = true,
   isDeveloper = false,
   year,
   month,
@@ -37,8 +37,6 @@ export default function ContentImportModal({
   const [error, setError] = useState('');
   const [rows, setRows] = useState(null);
   const [truncated, setTruncated] = useState(false);
-
-  const effectiveKey = resolveGeminiKey(geminiKey);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -67,14 +65,13 @@ export default function ContentImportModal({
   const handleAnalyze = async () => {
     setError('');
     if (!text.trim()) { setError('Paste your content plan or upload a file first.'); return; }
-    if (!effectiveKey) { setError('The Gemini API key has not been set up yet.'); return; }
+    if (!keyConfigured) { setError('The Gemini API key has not been set up yet.'); return; }
 
     setBusy(true);
     setProgress('Reading your sheet with Gemini...');
     try {
       const { items, truncated: wasTruncated } = await extractContentItems({
         text,
-        key: effectiveKey,
         monthLabel,
         year,
         month,
@@ -181,7 +178,7 @@ export default function ContentImportModal({
               <button type="button" onClick={downloadSample} style={s.linkBtn}><Download size={13} /> Sample template</button>
             </div>
 
-            {!effectiveKey && (
+            {!keyConfigured && (
               <div style={s.keyBox}>
                 <div style={{ fontSize: 'var(--font-size-sm)', marginBottom: isDeveloper ? '8px' : 0 }}>
                   <KeyRound size={13} style={{ verticalAlign: '-2px', marginRight: '6px' }} />

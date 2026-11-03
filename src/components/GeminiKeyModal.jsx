@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { KeyRound, Eye, EyeOff, Trash2 } from 'lucide-react';
-import { hasEnvGeminiKey, maskKey } from '../geminiImport';
 
-// Developer-only: saves the Gemini API key once for the whole team (system_settings.gemini_api_key).
-export default function GeminiKeyModal({ savedKey = '', onSave, onClose }) {
+// Developer-only: saves the Gemini API key once for the whole team (stored server-side via set_gemini_key).
+export default function GeminiKeyModal({ status = {}, onSave, onClose }) {
+  const saved = !!status.configured;
   const [draft, setDraft] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -31,11 +31,9 @@ export default function GeminiKeyModal({ savedKey = '', onSave, onClose }) {
     run(key, 'Saved. Everyone on the team can now use the AI Sheet Import.');
   };
 
-  const status = savedKey
-    ? <>Shared key saved: <strong>{maskKey(savedKey)}</strong></>
-    : hasEnvGeminiKey()
-      ? 'Using the key from the app settings (.env). Save a key here to override it.'
-      : 'No key yet. The AI Sheet Import is disabled until you add one.';
+  const statusText = saved
+    ? <>Shared key saved{status.masked ? <>: <strong>{status.masked}</strong></> : ''}. It is stored on the server and cannot be read back.</>
+    : 'No key yet. The AI Sheet Import is disabled until you add one.';
 
   return (
     <div style={s.overlay}>
@@ -51,10 +49,10 @@ export default function GeminiKeyModal({ savedKey = '', onSave, onClose }) {
           <button type="button" onClick={onClose} style={s.closeBtn} disabled={busy}>&times;</button>
         </div>
 
-        <div style={s.status}>{status}</div>
+        <div style={s.status}>{statusText}</div>
 
         <div>
-          <label style={s.label}>{savedKey ? 'Replace key' : 'New key'}</label>
+          <label style={s.label}>{saved ? 'Replace key' : 'New key'}</label>
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
               type={show ? 'text' : 'password'}
@@ -72,8 +70,8 @@ export default function GeminiKeyModal({ savedKey = '', onSave, onClose }) {
             </button>
           </div>
           <div style={s.hint}>
-            Only the Developer role sees this screen. Other users never type a key, but their browser does use it,
-            so restrict it and set a quota in Google AI Studio.
+            Only the Developer role sees this screen. The key is stored on the server: no user's browser can read it,
+            but the AI import uses it for everyone. In Google AI Studio, limit it to the Generative Language API and set a quota.
           </div>
         </div>
 
@@ -81,7 +79,7 @@ export default function GeminiKeyModal({ savedKey = '', onSave, onClose }) {
         {done && <div style={s.ok}>{done}</div>}
 
         <div style={s.footer}>
-          {savedKey ? (
+          {saved ? (
             <button
               type="button"
               className="btn-secondary"

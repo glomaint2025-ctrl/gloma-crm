@@ -50,7 +50,7 @@ export default function ContentCalendar({
   currentUserProfile = {},
   lang = 'en',
   monthlyPlans = [],
-  geminiKey = '',
+  geminiStatus = { configured: true, masked: '' },
   onSaveGeminiKey,
   onSaveTask,
   onSaveTasks,
@@ -378,7 +378,7 @@ export default function ContentCalendar({
           currentUserProfile={currentUserProfile}
           hasAssignPrivilege={hasAssignPrivilege}
           defaultClient={defaultClient}
-          geminiKey={geminiKey}
+          keyConfigured={geminiStatus.configured}
           isDeveloper={isDeveloper && !!onSaveGeminiKey}
           year={year}
           month={month}
@@ -391,7 +391,7 @@ export default function ContentCalendar({
 
       {keyOpen && (
         <GeminiKeyModal
-          savedKey={geminiKey}
+          status={geminiStatus}
           onSave={onSaveGeminiKey}
           onClose={() => setKeyOpen(false)}
         />

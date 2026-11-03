@@ -1,28 +1,17 @@
 // AI import for the Content Calendar: reads a pasted sheet or an uploaded
 // .txt / .csv / .xlsx file, asks Gemini to turn it into content-calendar items,
 // then matches clients and team members against what the CRM already knows.
+import { supabase } from './supabaseClient';
 import { CONTENT_TYPES, PLATFORMS, parsePlatforms } from './contentCalendarUtils';
 
 const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
 const FALLBACK_MODEL = 'gemini-flash-latest';
-const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+// The browser never sees the Gemini key: requests go through api/gemini.js, which adds it server-side.
+const PROXY_URL = '/api/gemini';
 
 const CHUNK_CHARS = 7000;
 const MAX_CHARS = 120000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-
-// The team-wide key is saved by the Developer in system_settings.gemini_api_key;
-// VITE_GEMINI_API_KEY from .env is the fallback.
-export const hasEnvGeminiKey = () => !!(import.meta.env.VITE_GEMINI_API_KEY || '').trim();
-
-export const resolveGeminiKey = (sharedKey) => String(sharedKey || '').trim() || (import.meta.env.VITE_GEMINI_API_KEY || '').trim();
-
-// "AIzaSy…Ab12" - enough to recognise a key without showing it.
-export const maskKey = (key) => {
-  const value = String(key || '').trim();
-  if (!value) return '';
-  return value.length > 10 ? `${value.slice(0, 4)}…${value.slice(-4)}` : '••••••••';
-};
 
 // ---- reading files ---------------------------------------------------------
 
@@ -112,26 +101,43 @@ ${chunk}
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const callGemini = async ({ prompt, key, model }) => {
-  const response = await fetch(`${ENDPOINT}/${model}:generateContent`, {
+const callGemini = async ({ prompt, model }) => {
+  // The local sandbox client has no getSession; a real session is always present on the deployed site.
+  const { data: sessionData } = (await supabase.auth.getSession?.()) || {};
+  const token = sessionData?.session?.access_token || '';
+
+  const response = await fetch(PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 16384,
-        responseMimeType: 'application/json',
-        responseSchema: ITEM_SCHEMA
+      model,
+      payload: {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 16384,
+          responseMimeType: 'application/json',
+          responseSchema: ITEM_SCHEMA
+        }
       }
     })
   });
 
   if (!response.ok) {
     let detail = '';
-    try { detail = (await response.json())?.error?.message || ''; } catch { /* non-JSON body */ }
-    const error = new Error(detail || `Gemini request failed (${response.status}).`);
+    let code = '';
+    try {
+      const failure = (await response.json())?.error;
+      detail = failure?.message || '';
+      code = failure?.code && typeof failure.code === 'string' ? failure.code : '';
+    } catch { /* non-JSON body: the /api route itself is missing (local dev server) */
+      if (response.status === 404) code = 'proxy_missing';
+    }
+    const error = new Error(code === 'proxy_missing'
+      ? 'The AI import runs on the deployed site only (it needs the /api/gemini server function), not on the local dev server.'
+      : detail || `Gemini request failed (${response.status}).`);
     error.status = response.status;
+    error.code = code;
     throw error;
   }
 
@@ -149,7 +155,7 @@ const callGemini = async ({ prompt, key, model }) => {
 
 const friendlyError = (error) => {
   if (error.status === 400 && /api key/i.test(error.message)) return 'The Gemini API key is not valid. Check it and try again.';
-  if (error.status === 403) return 'Gemini refused this key (permission denied). Make sure the Generative Language API is enabled for it and that it has no website restriction that blocks this app.';
+  if (error.status === 403) return 'Gemini refused this key (permission denied). Make sure the Generative Language API is enabled for it and that the key has no website (HTTP referrer) restriction, since requests now come from the server.';
   if (error.status === 429) return 'Gemini rate limit / free quota reached. Wait a minute and try again.';
   if (error instanceof SyntaxError) return 'Gemini replied with something that was not valid data. Try again, or import a smaller sheet.';
   return error.message || 'Gemini request failed.';
@@ -162,12 +168,12 @@ const requestWithRetry = async (args) => {
     try {
       return await callGemini({ ...args, model });
     } catch (error) {
-      if (error.status === 404 && !triedFallback) {
+      if (error.status === 404 && !error.code && !triedFallback) {
         triedFallback = true;
         model = FALLBACK_MODEL;
         continue;
       }
-      const retryable = error.status === 429 || error.status === 503 || error instanceof SyntaxError;
+      const retryable = !error.code && (error.status === 429 || error.status === 503 || error instanceof SyntaxError);
       if (!retryable || attempt === 3) throw new Error(friendlyError(error));
       await sleep(2000 * (attempt + 1));
     }
@@ -195,8 +201,7 @@ export const splitIntoChunks = (text) => {
 };
 
 // Runs every chunk through Gemini. onProgress(done, total) lets the UI show a bar.
-export const extractContentItems = async ({ text, key, monthLabel, year, month, memberNames, clientNames, onProgress }) => {
-  if (!key) throw new Error('Add your Gemini API key first.');
+export const extractContentItems = async ({ text, monthLabel, year, month, memberNames, clientNames, onProgress }) => {
   const trimmed = text.length > MAX_CHARS ? text.slice(0, MAX_CHARS) : text;
   const chunks = splitIntoChunks(trimmed);
   const now = new Date();
@@ -205,7 +210,7 @@ export const extractContentItems = async ({ text, key, monthLabel, year, month, 
   for (let i = 0; i < chunks.length; i++) {
     onProgress?.(i, chunks.length);
     const prompt = buildPrompt({ chunk: chunks[i], monthLabel, year, month, today, memberNames, clientNames });
-    all.push(...await requestWithRetry({ prompt, key, model: DEFAULT_MODEL }));
+    all.push(...await requestWithRetry({ prompt, model: DEFAULT_MODEL }));
   }
   onProgress?.(chunks.length, chunks.length);
   return { items: all, truncated: text.length > MAX_CHARS };
