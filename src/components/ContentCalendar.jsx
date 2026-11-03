@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Filter, Calendar as CalIcon, Plus } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Filter, Calendar as CalIcon, Plus, Sparkles } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { sendTaskAssignedEmail } from '../emailService';
 import MonthlyPlan from './MonthlyPlan';
+import ContentItemModal from './ContentItemModal';
+import ContentImportModal from './ContentImportModal';
+import {
+  CONTENT_TYPES, PLATFORMS, contentTypeOf, parsePlatforms, platformColor, dateKeyOf, statusColor
+} from '../contentCalendarUtils';
 
 const localTranslations = {
   en: {
@@ -10,56 +15,31 @@ const localTranslations = {
     filterClient: "All Clients",
     filterType: "All Content Types",
     filterEmployee: "All Employees",
-    selfAssigned: "This will be added to your own work:",
-    quickAdd: "Quick Add Assignment",
-    prefilledDate: "Pre-filled Date:",
-    save: "Create Task",
-    cancel: "Cancel",
-    workType: "Work Type",
-    client: "Client / Project",
-    taskDetail: "Task Details",
-    employee: "Assign Teammate",
-    priority: "Priority",
-    dueDate: "Due Date",
-    startDate: "Start Date"
+    filterPlatform: "All Platforms",
+    newContent: "New Content",
+    aiImport: "AI Sheet Import"
   },
   si: {
     title: "අන්තර්ගත දින දර්ශනය",
     filterClient: "සියලුම සේවාදායකයින්",
     filterType: "සියලුම වර්ගයන්",
     filterEmployee: "සියලුම සේවකයින්",
-    selfAssigned: "මෙය ඔබේම කාර්යයක් ලෙස එක් වේ:",
-    quickAdd: "කෙටි ක්‍රමයකින් එක් කරන්න",
-    prefilledDate: "තෝරාගත් දිනය:",
-    save: "සුරකින්න",
-    cancel: "අවලංගු කරන්න",
-    workType: "කාර්ය මාදිලිය",
-    client: "සේවාදායකයා",
-    taskDetail: "කාර්ය විස්තරය",
-    employee: "සේවකයා පවරන්න",
-    priority: "ප්‍රමුඛතාවය",
-    dueDate: "අවසන් දිනය",
-    startDate: "ආරම්භක දිනය"
+    filterPlatform: "සියලුම වේදිකා",
+    newContent: "නව අන්තර්ගතය",
+    aiImport: "AI ආනයනය"
   },
   ta: {
     title: "உள்ளடக்க காலெண்டர்",
     filterClient: "அனைத்து வாடிக்கையாளர்கள்",
     filterType: "அனைத்து வகைகள்",
     filterEmployee: "அனைத்து ஊழியர்கள்",
-    selfAssigned: "இது உங்கள் சொந்த பணியாகச் சேர்க்கப்படும்:",
-    quickAdd: "விரைவாகச் சேர்க்கவும்",
-    prefilledDate: "தேர்ந்தெடுக்கப்பட்ட தேதி:",
-    save: "பணியை உருவாக்கு",
-    cancel: "ரத்து செய்",
-    workType: "பணி வகை",
-    client: "வாடிக்கையாளர்",
-    taskDetail: "விவரங்கள்",
-    employee: "சக ஊழியரைப் பணியமர்த்துக",
-    priority: "முன்னுரிமை",
-    dueDate: "முடிவு தேதி",
-    startDate: "துவக்க தேதி"
+    filterPlatform: "அனைத்து தளங்கள்",
+    newContent: "புதிய உள்ளடக்கம்",
+    aiImport: "AI இறக்குமதி"
   }
 };
+
+const pad = (n) => String(n).padStart(2, '0');
 
 export default function ContentCalendar({
   tasks = [],
@@ -69,27 +49,25 @@ export default function ContentCalendar({
   lang = 'en',
   monthlyPlans = [],
   onSaveTask,
+  onSaveTasks,
+  onDeleteTask,
   onSavePlan,
   onDeletePlan
 }) {
-  const t = localTranslations[lang] || localTranslations.en;
-  
+  const t = { ...localTranslations.en, ...(localTranslations[lang] || {}) };
+
   // Filters
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
-  
+  const [selectedPlatform, setSelectedPlatform] = useState('');
+
   // Date states
   const [currentDate, setCurrentDate] = useState(new Date());
-  
-  // Click-to-add modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState('');
-  const [clientProject, setClientProject] = useState('');
-  const [workType, setWorkType] = useState('Post');
-  const [taskDetail, setTaskDetail] = useState('');
-  const [assignedEmployee, setAssignedEmployee] = useState('');
-  const [priority, setPriority] = useState('Normal');
+
+  // Editor / import modals
+  const [editor, setEditor] = useState(null); // { task, date }
+  const [importOpen, setImportOpen] = useState(false);
 
   const userRole = currentUserProfile?.role || 'Employee';
   const hasAssignPrivilege = ['Developer', 'Admin', 'Manager', 'Coordinator & Accountant'].includes(userRole);
@@ -97,128 +75,97 @@ export default function ContentCalendar({
   // Calendar calculations
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-
-  const tempFirstDay = new Date(year, month, 1);
-  const startDayIdx = tempFirstDay.getDay(); // 0 is Sunday, 1 is Monday
-
+  const startDayIdx = new Date(year, month, 1).getDay(); // 0 is Sunday
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
-  };
+  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
-  };
+  // Preset types plus any custom ones already in use.
+  const typeOptions = useMemo(() => {
+    const names = CONTENT_TYPES.map(c => c.value);
+    tasks.forEach(task => {
+      const type = contentTypeOf(task);
+      if (type && !names.includes(type)) names.push(type);
+    });
+    return names;
+  }, [tasks]);
 
-  // Filter tasks
   const calendarTasks = tasks.filter(task => {
-    const matchesClient = !selectedClient || task.client_id === selectedClient || task.client_project === selectedClient;
-    const matchesType = !selectedType || task.work_type === selectedType;
+    const matchesClient = !selectedClient || task.client_project === selectedClient
+      || task.client_id === clients.find(c => c.name === selectedClient)?.id;
+    const matchesType = !selectedType || contentTypeOf(task) === selectedType;
     const matchesEmployee = !selectedEmployee || task.employee_id === selectedEmployee;
-    return matchesClient && matchesType && matchesEmployee;
+    const matchesPlatform = !selectedPlatform || parsePlatforms(task.platforms).includes(selectedPlatform);
+    return matchesClient && matchesType && matchesEmployee && matchesPlatform;
   });
 
   const getTasksForDay = (dayNum) => {
-    return calendarTasks.filter(task => {
-      if (!task.due_date) return false;
-      const tDate = new Date(task.due_date);
-      return tDate.getDate() === dayNum && tDate.getMonth() === month && tDate.getFullYear() === year;
+    const key = `${year}-${pad(month + 1)}-${pad(dayNum)}`;
+    return calendarTasks.filter(task => dateKeyOf(task.due_date) === key);
+  };
+
+  const openNew = (dayNum) => {
+    setEditor({ task: null, date: `${year}-${pad(month + 1)}-${pad(dayNum)}` });
+  };
+
+  const notifyAssignee = async (taskObj, profile, previous) => {
+    const changed = !previous || previous.employee_id !== profile?.id;
+    if (!profile || profile.id === currentUserProfile?.id || !changed) return;
+    try {
+      await supabase.from('notifications').insert({
+        user_id: profile.id,
+        message: `New task assigned to you [${taskObj.id}]: ${taskObj.title} (${taskObj.content_type || taskObj.work_type})`,
+        read: false
+      });
+    } catch (err) {
+      console.error('Notification logging failed:', err);
+    }
+    sendTaskAssignedEmail({
+      toEmail: profile.email,
+      toName: profile.full_name,
+      taskId: taskObj.id,
+      taskTitle: taskObj.title,
+      clientName: taskObj.client_project,
+      workType: taskObj.content_type || taskObj.work_type,
+      priority: taskObj.priority,
+      dueDate: taskObj.due_date,
+      assignedBy: currentUserProfile?.full_name,
+      assignedByEmail: currentUserProfile?.email
     });
   };
 
-  const handleDayClick = (dayNum) => {
-    const pad = (n) => String(n).padStart(2, '0');
-    const formattedDate = `${year}-${pad(month + 1)}-${pad(dayNum)}`;
-    setSelectedCalendarDate(formattedDate);
-    
-    // Set default client if filtered
-    setClientProject(selectedClient ? (clients.find(c => c.id === selectedClient)?.name || '') : '');
-    setWorkType(selectedType || 'Post');
-    setTaskDetail('');
-    // Employees schedule work for themselves; privileged roles pick the assignee.
-    setAssignedEmployee(hasAssignPrivilege ? '' : currentUserProfile.id);
-    setPriority('Normal');
-    setIsModalOpen(true);
+  const handleSubmit = async (taskObj, { previous, profile }) => {
+    const result = await onSaveTask(taskObj);
+    if (result && result.success === false) return result;
+    setEditor(null);
+    await notifyAssignee(taskObj, profile, previous);
+    return { success: true };
   };
 
-  const handleQuickSave = async (e) => {
-    e.preventDefault();
-    if (!clientProject.trim() || !taskDetail.trim()) {
-      alert("Client & Task Detail are required.");
-      return;
-    }
+  const handleImport = async (items) => {
+    const result = await onSaveTasks(items);
+    if (result && result.success === false) return result;
 
-    let selectedEmpId = null;
-    let selectedEmpName = '';
-    const effectiveAssignee = hasAssignPrivilege ? assignedEmployee : currentUserProfile.id;
-    const foundProfile = profiles.find(p => p.id === effectiveAssignee);
-    if (foundProfile) {
-      selectedEmpId = foundProfile.id;
-      selectedEmpName = foundProfile.full_name;
-    }
-
-    const assignedClientObj = clients.find(c => c.name === clientProject || c.id === clientProject);
-
-    // Generate ID: GLM-YYMMDD-XXX
-    const codeDate = selectedCalendarDate.replace(/-/g, '').substring(2);
-    const randCode = Math.floor(100 + Math.random() * 900);
-    const taskId = `GLM-${codeDate}-${randCode}`;
-
-    const newTask = {
-      id: taskId,
-      created_at: new Date().toISOString(),
-      date_assigned: selectedCalendarDate,
-      start_date: selectedCalendarDate,
-      due_date: selectedCalendarDate,
-      employee_id: selectedEmpId,
-      employee_name: selectedEmpName || 'Unassigned',
-      client_id: assignedClientObj ? assignedClientObj.id : null,
-      client_project: assignedClientObj ? assignedClientObj.name : clientProject,
-      work_type: workType,
-      title: taskDetail,
-      priority: priority,
-      status: hasAssignPrivilege ? 'Pending Approval' : 'In Progress',
-      progress: 0.0,
-      last_updated: new Date().toISOString()
-    };
-    if (!hasAssignPrivilege) {
-      newTask.created_by = currentUserProfile.id;
-    }
-
-    const result = await onSaveTask(newTask);
-    if (result && result.success === false) {
-      alert(`Failed to save task: ${result.error || 'Unknown error'}`);
-      return;
-    }
-    setIsModalOpen(false);
-
-    // Same assignment notification + email as the Task Board's "New Task" flow.
-    // Only after the task itself actually saved.
-    if (selectedEmpId && selectedEmpId !== currentUserProfile?.id) {
+    // One in-app notification per teammate instead of one per item.
+    const perPerson = {};
+    items.forEach(item => {
+      if (item.employee_id && item.employee_id !== currentUserProfile?.id) {
+        perPerson[item.employee_id] = (perPerson[item.employee_id] || 0) + 1;
+      }
+    });
+    for (const [userId, count] of Object.entries(perPerson)) {
       try {
         await supabase.from('notifications').insert({
-          user_id: selectedEmpId,
-          message: `New task assigned to you [${taskId}]: ${taskDetail} (${workType})`,
+          user_id: userId,
+          message: `${count} content item${count === 1 ? '' : 's'} assigned to you on the content calendar by ${currentUserProfile?.full_name || 'a teammate'}.`,
           read: false
         });
       } catch (err) {
         console.error('Notification logging failed:', err);
       }
-
-      sendTaskAssignedEmail({
-        toEmail: foundProfile?.email,
-        toName: selectedEmpName,
-        taskId,
-        taskTitle: taskDetail,
-        clientName: newTask.client_project,
-        workType,
-        priority,
-        dueDate: selectedCalendarDate,
-        assignedBy: currentUserProfile?.full_name,
-        assignedByEmail: currentUserProfile?.email
-      });
     }
+    return { success: true };
   };
 
   const monthNames = [
@@ -226,16 +173,17 @@ export default function ContentCalendar({
     "July", "August", "September", "October", "November", "December"
   ];
 
+  const defaultClient = selectedClient;
+  const todayDate = new Date();
+
   // Render Calendar Grid
   const calendarCells = [];
-  // Empty slots at beginning
   for (let i = 0; i < startDayIdx; i++) {
     calendarCells.push(<div key={`empty-${i}`} className="calendar-day empty-day" style={styles.emptyDay}></div>);
   }
-  // Month days
   for (let day = 1; day <= daysInMonth; day++) {
     const dayTasks = getTasksForDay(day);
-    const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
+    const isToday = todayDate.getDate() === day && todayDate.getMonth() === month && todayDate.getFullYear() === year;
 
     calendarCells.push(
       <div
@@ -245,7 +193,7 @@ export default function ContentCalendar({
           border: isToday ? '1px solid var(--color-gold)' : '1px solid var(--border-subtle)',
           backgroundColor: isToday ? 'rgba(212,175,55,0.05)' : 'rgba(17,24,39,0.3)'
         }}
-        onClick={() => handleDayClick(day)}
+        onClick={() => openNew(day)}
         className="calendar-day"
       >
         <span style={{
@@ -256,35 +204,41 @@ export default function ContentCalendar({
           {day}
         </span>
         <div style={styles.dayTasksContainer}>
-          {dayTasks.map(task => (
-            <div 
-              key={task.id} 
-              style={{
-                ...styles.taskTag,
-                backgroundColor: 
-                  task.status === 'Delivered' ? 'rgba(16,185,129,0.15)' :
-                  task.status === 'In Progress' ? 'rgba(59,130,246,0.15)' :
-                  task.status === 'Approved' ? 'rgba(139,92,246,0.15)' : 'rgba(245,158,11,0.15)',
-                color:
-                  task.status === 'Delivered' ? '#10B981' :
-                  task.status === 'In Progress' ? '#3B82F6' :
-                  task.status === 'Approved' ? '#8B5CF6' : '#F59E0B',
-                borderLeft: `2.5px solid ${
-                  task.status === 'Delivered' ? '#10B981' :
-                  task.status === 'In Progress' ? '#3B82F6' :
-                  task.status === 'Approved' ? '#8b5cf6' : '#F59E0B'
-                }`
-              }}
-              title={`[${task.id}] ${task.client_project}: ${task.title}`}
-            >
-              <div style={styles.taskTagText}>
-                <strong>{task.work_type}:</strong> {task.title}
-                {task.employee_name && task.employee_name !== 'Unassigned' && (
-                  <span style={{ opacity: 0.8 }}> - {task.employee_name.split(' ')[0]}</span>
+          {dayTasks.map(task => {
+            const platforms = parsePlatforms(task.platforms);
+            const color = statusColor(task.status);
+            const label = task.content_id || contentTypeOf(task);
+            return (
+              <div
+                key={task.id}
+                onClick={(e) => { e.stopPropagation(); setEditor({ task, date: dateKeyOf(task.due_date) }); }}
+                style={{
+                  ...styles.taskTag,
+                  backgroundColor: `${color}26`,
+                  color,
+                  borderLeft: `2.5px solid ${color}`
+                }}
+                title={[
+                  `[${task.id}] ${task.client_project}`,
+                  `${contentTypeOf(task)}${platforms.length ? ` · ${platforms.join(', ')}` : ''}`,
+                  task.title,
+                  task.employee_name && task.employee_name !== 'Unassigned' ? `Assigned: ${task.employee_name}` : ''
+                ].filter(Boolean).join('\n')}
+              >
+                <div style={styles.taskTagText}>
+                  <strong>{label}:</strong> {task.title}
+                  {task.employee_name && task.employee_name !== 'Unassigned' && (
+                    <span style={{ opacity: 0.8 }}> - {task.employee_name.split(' ')[0]}</span>
+                  )}
+                </div>
+                {platforms.length > 0 && (
+                  <div style={styles.dotRow}>
+                    {platforms.map(p => <span key={p} style={{ ...styles.dot, backgroundColor: platformColor(p) }} title={p} />)}
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -292,7 +246,7 @@ export default function ContentCalendar({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="animate-fade-in">
-      
+
       {/* Header and filters bar */}
       <div style={styles.headerBar} className="glass-panel">
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -300,71 +254,55 @@ export default function ContentCalendar({
           <h3>{t.title}</h3>
         </div>
 
-        {/* Filters and Month pagination */}
         <div style={styles.filterMenu}>
-          
-          {/* Client Filter */}
           <div style={styles.filterItem}>
             <Filter size={13} color="var(--color-gold)" />
-            <select
-              value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              style={styles.selectFilter}
-            >
+            <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} style={styles.selectFilter}>
               <option value="">{t.filterClient}</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
+              {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
 
-          {/* Employee Filter */}
           <div style={styles.filterItem}>
-            <select
-              value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              style={styles.selectFilter}
-            >
+            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} style={styles.selectFilter}>
               <option value="">{t.filterEmployee}</option>
-              {profiles.map(p => (
-                <option key={p.id} value={p.id}>{p.full_name}</option>
-              ))}
+              {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </select>
           </div>
 
-          {/* Type Filter */}
           <div style={styles.filterItem}>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              style={styles.selectFilter}
-            >
+            <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} style={styles.selectFilter}>
               <option value="">{t.filterType}</option>
-              <option value="Post">Post (Facebook/Instagram)</option>
-              <option value="Reel">Reel / Short Video</option>
-              <option value="Website">Website Development</option>
-              <option value="Other">Other Content Type</option>
+              {typeOptions.map(type => <option key={type} value={type}>{type}</option>)}
             </select>
           </div>
 
-          {/* Month Pagination */}
-          <div style={styles.pagination}>
-            <button onClick={handlePrevMonth} style={styles.pagBtn}>
-              <ChevronLeft size={16} />
-            </button>
-            <span style={styles.monthDisplay}>
-              {monthNames[month]} {year}
-            </span>
-            <button onClick={handleNextMonth} style={styles.pagBtn}>
-              <ChevronRight size={16} />
-            </button>
+          <div style={styles.filterItem}>
+            <select value={selectedPlatform} onChange={(e) => setSelectedPlatform(e.target.value)} style={styles.selectFilter}>
+              <option value="">{t.filterPlatform}</option>
+              {PLATFORMS.map(p => <option key={p.value} value={p.value}>{p.value}</option>)}
+            </select>
           </div>
 
+          <div style={styles.pagination}>
+            <button onClick={handlePrevMonth} style={styles.pagBtn}><ChevronLeft size={16} /></button>
+            <span style={styles.monthDisplay}>{monthNames[month]} {year}</span>
+            <button onClick={handleNextMonth} style={styles.pagBtn}><ChevronRight size={16} /></button>
+          </div>
+
+          <button type="button" className="btn-secondary" style={styles.headerBtn} onClick={() => setImportOpen(true)}>
+            <Sparkles size={14} /> {t.aiImport}
+          </button>
+          <button type="button" className="btn-primary" style={styles.headerBtn} onClick={() => openNew(
+            todayDate.getMonth() === month && todayDate.getFullYear() === year ? todayDate.getDate() : 1
+          )}>
+            <Plus size={14} /> {t.newContent}
+          </button>
         </div>
       </div>
 
       <MonthlyPlan
-        monthKey={`${year}-${String(month + 1).padStart(2, '0')}`}
+        monthKey={`${year}-${pad(month + 1)}`}
         monthLabel={`${monthNames[month]} ${year}`}
         plans={monthlyPlans}
         tasks={tasks}
@@ -376,6 +314,21 @@ export default function ContentCalendar({
         onDeletePlan={onDeletePlan}
       />
 
+      {/* Legend */}
+      <div style={styles.legend}>
+        {PLATFORMS.map(p => (
+          <span key={p.value} style={styles.legendItem}>
+            <span style={{ ...styles.dot, width: '8px', height: '8px', backgroundColor: p.color }} /> {p.value}
+          </span>
+        ))}
+        <span style={styles.legendSep} />
+        {['Pending Approval', 'Approved', 'In Progress', 'Delivered'].map(status => (
+          <span key={status} style={styles.legendItem}>
+            <span style={{ ...styles.statusSwatch, backgroundColor: statusColor(status) }} /> {status}
+          </span>
+        ))}
+      </div>
+
       {/* Week Header + Calendar Grid (horizontally scrollable on narrow screens) */}
       <div style={{ overflowX: 'auto' }}>
         <div style={{ minWidth: '640px' }}>
@@ -384,115 +337,42 @@ export default function ContentCalendar({
               <div key={d} style={styles.weekLabel}>{d}</div>
             ))}
           </div>
-
-          <div style={styles.calendarGrid}>
-            {calendarCells}
-          </div>
+          <div style={styles.calendarGrid}>{calendarCells}</div>
         </div>
       </div>
 
-      {/* Quick Add Modal */}
-      {isModalOpen && (
-        <div style={styles.modalOverlay}>
-          <div className="glass-panel" style={styles.modalContent}>
-            <div style={styles.modalHeader}>
-              <h3>{t.quickAdd}</h3>
-              <button onClick={() => setIsModalOpen(false)} style={styles.closeBtn}>&times;</button>
-            </div>
+      {editor && (
+        <ContentItemModal
+          key={editor.task ? editor.task.id : `new-${editor.date}`}
+          task={editor.task}
+          defaultDate={editor.date}
+          defaultClient={defaultClient}
+          defaultType={selectedType}
+          tasks={tasks}
+          clients={clients}
+          profiles={profiles}
+          currentUserProfile={currentUserProfile}
+          hasAssignPrivilege={hasAssignPrivilege}
+          onSubmit={handleSubmit}
+          onDelete={onDeleteTask}
+          onClose={() => setEditor(null)}
+        />
+      )}
 
-            <form onSubmit={handleQuickSave} style={styles.modalForm}>
-              <div style={styles.formDateNotice}>
-                <span>{t.prefilledDate} <strong>{selectedCalendarDate}</strong></span>
-              </div>
-
-              <div>
-                <label style={styles.label}>{t.client}</label>
-                <select
-                  required
-                  value={clientProject}
-                  onChange={(e) => setClientProject(e.target.value)}
-                  className="form-input"
-                >
-                  <option value="">Choose Client</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                  <option value="Gloma Internal">Gloma Internal Task</option>
-                </select>
-              </div>
-
-              <div style={styles.formRow}>
-                <div style={{ flex: 1 }}>
-                  <label style={styles.label}>{t.workType}</label>
-                  <select
-                    value={workType}
-                    onChange={(e) => setWorkType(e.target.value)}
-                    className="form-input"
-                  >
-                    <option value="Post">Post (Facebook/Insta)</option>
-                    <option value="Reel">Reel / Video</option>
-                    <option value="Website">Website</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                
-                <div style={{ flex: 1 }}>
-                  <label style={styles.label}>{t.priority}</label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                    className="form-input"
-                  >
-                    <option value="High">High</option>
-                    <option value="Normal">Normal</option>
-                    <option value="Low">Low</option>
-                  </select>
-                </div>
-              </div>
-
-              {hasAssignPrivilege ? (
-                <div>
-                  <label style={styles.label}>{t.employee}</label>
-                  <select
-                    value={assignedEmployee}
-                    onChange={(e) => setAssignedEmployee(e.target.value)}
-                    className="form-input"
-                  >
-                    <option value="">Unassigned Teammate</option>
-                    {profiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div style={styles.formDateNotice}>
-                  <span>{t.selfAssigned} <strong>{currentUserProfile.full_name}</strong></span>
-                </div>
-              )}
-
-              <div>
-                <label style={styles.label}>{t.taskDetail}</label>
-                <textarea
-                  required
-                  rows={2}
-                  placeholder="Draft caption, description, website features..."
-                  value={taskDetail}
-                  onChange={(e) => setTaskDetail(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-
-              <div style={styles.modalActions}>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary">
-                  {t.cancel}
-                </button>
-                <button type="submit" className="btn-primary">
-                  {t.save}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {importOpen && (
+        <ContentImportModal
+          clients={clients}
+          profiles={profiles}
+          tasks={tasks}
+          currentUserProfile={currentUserProfile}
+          hasAssignPrivilege={hasAssignPrivilege}
+          defaultClient={defaultClient}
+          year={year}
+          month={month}
+          monthLabel={`${monthNames[month]} ${year}`}
+          onImport={handleImport}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );
@@ -530,6 +410,11 @@ const styles = {
     fontSize: 'var(--font-size-sm)',
     cursor: 'pointer'
   },
+  headerBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px'
+  },
   pagination: {
     display: 'flex',
     alignItems: 'center',
@@ -555,6 +440,29 @@ const styles = {
     color: 'var(--color-text-primary)',
     minWidth: '100px',
     textAlign: 'center'
+  },
+  legend: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    flexWrap: 'wrap',
+    fontSize: 'var(--font-size-xs)',
+    color: 'var(--color-text-secondary)'
+  },
+  legendItem: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '5px'
+  },
+  legendSep: {
+    width: '1px',
+    height: '14px',
+    backgroundColor: 'var(--border-subtle)'
+  },
+  statusSwatch: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '3px'
   },
   weekGrid: {
     display: 'grid',
@@ -585,7 +493,8 @@ const styles = {
     gap: '6px',
     minHeight: '110px',
     cursor: 'pointer',
-    transition: 'all 0.15s ease'
+    transition: 'all 0.15s ease',
+    minWidth: 0
   },
   emptyDay: {
     backgroundColor: 'transparent',
@@ -610,79 +519,24 @@ const styles = {
     lineHeight: 1.2,
     fontWeight: '600',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
-  },
-  taskTagText: {
-    display: 'block',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999,
-    backdropFilter: 'blur(4px)',
-    padding: '16px'
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: '480px',
-    padding: 'clamp(16px, 4vw, 24px)',
-    backgroundColor: 'var(--bg-panel)',
-    borderColor: 'var(--border-glass)',
-    maxHeight: '90vh',
-    overflowY: 'auto'
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '15px'
-  },
-  closeBtn: {
-    fontSize: 'var(--font-size-2xl)',
-    background: 'none',
-    border: 'none',
-    color: 'var(--color-text-muted)',
     cursor: 'pointer'
   },
-  modalForm: {
+  taskTagText: {
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+    wordBreak: 'break-word'
+  },
+  dotRow: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
+    gap: '3px',
+    marginTop: '3px'
   },
-  formDateNotice: {
-    padding: '8px 12px',
-    backgroundColor: 'rgba(212,175,55,0.08)',
-    border: '1px dashed rgba(212,175,55,0.3)',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: 'var(--font-size-sm)',
-    color: 'var(--color-text-primary)'
-  },
-  label: {
-    display: 'block',
-    fontSize: 'var(--font-size-sm)',
-    fontWeight: 'bold',
-    color: 'var(--color-text-secondary)',
-    marginBottom: '4px'
-  },
-  formRow: {
-    display: 'flex',
-    gap: '12px'
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
-    marginTop: '10px'
+  dot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    display: 'inline-block'
   }
 };

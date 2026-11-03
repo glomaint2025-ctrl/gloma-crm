@@ -20,6 +20,7 @@ import UpdateBanner from './components/UpdateBanner';
 import DesktopUpdate from './components/DesktopUpdate';
 import MyPayslips from './components/MyPayslips';
 import Letters from './components/Letters';
+import { CONTENT_FIELD_RE } from './contentCalendarUtils';
 import { splitWorkedMinutes, isHoliday, getClosingTime, todayStr, OFFICE_OPEN_TIME } from './workHours';
 
 import {
@@ -120,6 +121,14 @@ const guardDeveloperRole = (role, email) => {
   }
   return role;
 };
+
+// Before supabase_add_content_calendar_fields.sql is run, Supabase rejects the new
+// content columns with "Could not find the 'caption' column ...": say what to do about it.
+const contentSaveError = (err) => (
+  /column|schema cache/i.test(err?.message || '') && CONTENT_FIELD_RE.test(err.message)
+    ? 'Content fields are not set up in the database yet. Run supabase_add_content_calendar_fields.sql in the Supabase SQL Editor, then try again.'
+    : err?.message
+);
 
 export default function App() {
   const [sessionUser, setSessionUser] = useState(null);
@@ -688,7 +697,20 @@ export default function App() {
       return { success: true };
     } catch (err) {
       console.error('Error saving task:', err);
-      return { success: false, error: err.message };
+      return { success: false, error: contentSaveError(err) };
+    }
+  };
+
+  // Content-calendar AI import: every item in one request.
+  const handleSaveTasks = async (taskList) => {
+    try {
+      const { error } = await supabase.from('tasks').insert(taskList);
+      if (error) throw error;
+      await refreshData();
+      return { success: true };
+    } catch (err) {
+      console.error('Error importing content items:', err);
+      return { success: false, error: contentSaveError(err) };
     }
   };
 
@@ -1122,6 +1144,8 @@ export default function App() {
             lang={lang}
             monthlyPlans={monthlyPlans}
             onSaveTask={handleSaveTask}
+            onSaveTasks={handleSaveTasks}
+            onDeleteTask={handleDeleteTask}
             onSavePlan={handleSavePlan}
             onDeletePlan={handleDeletePlan}
           />
