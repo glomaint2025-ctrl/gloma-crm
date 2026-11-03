@@ -609,11 +609,12 @@ export default function App() {
       return { success: true };
     } catch (err) {
       console.error('Error saving Gemini key:', err);
+      const detail = [err?.message, err?.details, err?.hint].filter(Boolean).join(' - ') || 'Unknown error';
       return {
         success: false,
-        error: /gemini_api_key|schema cache|column/i.test(err?.message || '')
-          ? 'The database is not set up for the Gemini key yet. Run supabase_add_gemini_key.sql in the Supabase SQL Editor, then try again.'
-          : err?.message
+        error: /gemini_api_key/i.test(detail)
+          ? `The database is not set up for the Gemini key yet. Run supabase_add_gemini_key.sql in the Supabase SQL Editor, then try again. (${detail})`
+          : `Could not save the key: ${detail}`
       };
     }
   };
