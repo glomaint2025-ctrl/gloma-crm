@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Clock, Filter, Sun, Table2, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Filter, Sun, Table2, CalendarDays, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 import { formatMinutes, getHoliday } from '../workHours';
 
 const localTranslations = {
@@ -76,6 +77,7 @@ export default function WorkHours({
   timeLogs = [],
   profiles = [],
   currentUserProfile = {},
+  onRefreshData,
   lang = 'en'
 }) {
   const t = localTranslations[lang] || localTranslations.en;
@@ -86,6 +88,7 @@ export default function WorkHours({
   const [filterEmployee, setFilterEmployee] = useState('');
   const [view, setView] = useState('history'); // 'history' | 'calendar'
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [resetting, setResetting] = useState(false);
 
   const baseLogs = canSeeAll
     ? timeLogs
@@ -95,6 +98,42 @@ export default function WorkHours({
 
   const totalRegular = visibleLogs.reduce((sum, l) => sum + (l.regular_minutes || 0), 0);
   const totalOvertime = visibleLogs.reduce((sum, l) => sum + (l.overtime_minutes || 0), 0);
+
+  // Developer only: zero one employee's overtime, or their working (regular) time, on its own.
+  // The days and clock-in/out times stay, so attendance and finalized payslips are untouched.
+  const isDeveloper = userRole === 'Developer';
+  const resetTarget = isDeveloper && filterEmployee ? profiles.find(p => p.id === filterEmployee) : null;
+
+  const handleReset = async (kind) => {
+    if (!resetTarget) return;
+    const isOt = kind === 'overtime';
+    const affected = visibleLogs.filter(l => (isOt ? (l.overtime_minutes || 0) > 0 || l.ot_enabled : (l.regular_minutes || 0) > 0));
+    const minutes = isOt ? totalOvertime : totalRegular;
+    if (affected.length === 0) {
+      alert(`${resetTarget.full_name} has no ${isOt ? 'overtime' : 'working time'} to reset.`);
+      return;
+    }
+    const proceed = confirm(
+      `Reset ${isOt ? 'OVERTIME' : 'WORKING TIME'} for ${resetTarget.full_name}?
+
+` +
+      `${formatMinutes(minutes)} across ${affected.length} day(s) will be set to 0. ` +
+      `${isOt ? 'Working time' : 'Overtime'} and attendance are not changed, and finalized payslips are not changed. This cannot be undone.`
+    );
+    if (!proceed) return;
+
+    setResetting(true);
+    const fields = isOt
+      ? { overtime_minutes: 0, ...(affected.some(l => l.ot_enabled) ? { ot_enabled: false } : {}) }
+      : { regular_minutes: 0 };
+    const { error } = await supabase.from('time_logs').update(fields).eq('user_id', resetTarget.id);
+    setResetting(false);
+    if (error) {
+      alert(`Could not reset: ${error.message}`);
+      return;
+    }
+    if (onRefreshData) await onRefreshData();
+  };
 
   // ===== Holiday calendar view =====
   const calYear = calendarDate.getFullYear();
@@ -206,6 +245,25 @@ export default function WorkHours({
           </div>
         )}
       </div>
+
+      {isDeveloper && (
+        <div className="glass-panel" style={styles.resetPanel}>
+          <div style={{ flex: 1, minWidth: '220px' }}>
+            <div style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)' }}>Developer: reset hours</div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+              {resetTarget
+                ? `Reset ${resetTarget.full_name}'s overtime or working time separately.`
+                : 'Choose an employee in the filter above to reset their overtime or working time.'}
+            </div>
+          </div>
+          <button type="button" className="btn-secondary" style={styles.resetBtn} disabled={!resetTarget || resetting} onClick={() => handleReset('overtime')}>
+            <RotateCcw size={14} /> Reset overtime
+          </button>
+          <button type="button" className="btn-secondary" style={styles.resetBtn} disabled={!resetTarget || resetting} onClick={() => handleReset('regular')}>
+            <RotateCcw size={14} /> Reset working time
+          </button>
+        </div>
+      )}
 
       {view === 'history' && (
         <div className="glass-panel" style={{ padding: '8px' }}>
@@ -337,6 +395,19 @@ const styles = {
     alignItems: 'center',
     gap: '6px',
     transition: 'all var(--transition-fast)'
+  },
+  resetPanel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    padding: '12px 16px'
+  },
+  resetBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    color: '#EF4444'
   },
   summaryRow: {
     display: 'flex',

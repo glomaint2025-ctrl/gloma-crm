@@ -1238,6 +1238,7 @@ export default function App() {
             timeLogs={timeLogs}
             profiles={profiles}
             currentUserProfile={currentUserProfile}
+            onRefreshData={refreshData}
             lang={lang}
           />
         )}
