@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, Filter, Sun, Table2, CalendarDays, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { supabase, isUsingMock } from '../supabaseClient';
 import { formatMinutes, getHoliday } from '../workHours';
 
 const localTranslations = {
@@ -123,16 +123,26 @@ export default function WorkHours({
     if (!proceed) return;
 
     setResetting(true);
-    const fields = isOt
-      ? { overtime_minutes: 0, ...(affected.some(l => l.ot_enabled) ? { ot_enabled: false } : {}) }
-      : { regular_minutes: 0 };
-    const { error } = await supabase.from('time_logs').update(fields).eq('user_id', resetTarget.id);
-    setResetting(false);
-    if (error) {
-      alert(`Could not reset: ${error.message}`);
-      return;
+    let failure = '';
+    if (isUsingMock) {
+      // Local sandbox has no database functions: update the rows directly.
+      const fields = isOt ? { overtime_minutes: 0, ot_enabled: false } : { regular_minutes: 0 };
+      const { error } = await supabase.from('time_logs').update(fields).eq('user_id', resetTarget.id);
+      if (error) failure = error.message;
+    } else {
+      // A database function, because the time_logs policies only let people edit their own rows.
+      const { data, error } = await supabase.rpc('dev_reset_hours', { target_user: resetTarget.id, kind });
+      if (error) {
+        failure = /dev_reset_hours|schema cache|could not find the function/i.test(error.message || '')
+          ? 'The database is not set up for resets yet. Run supabase_dev_reset_hours.sql in the Supabase SQL Editor, then try again.'
+          : error.message;
+      } else if (!data) {
+        failure = 'Nothing was changed.';
+      }
     }
+    setResetting(false);
     if (onRefreshData) await onRefreshData();
+    if (failure) alert(`Could not reset: ${failure}`);
   };
 
   // ===== Holiday calendar view =====
