@@ -4,7 +4,6 @@ import {
   Users,
   Banknote,
   CalendarCheck,
-  HandCoins,
   FileBarChart,
   Settings2,
   AlertTriangle,
@@ -22,14 +21,11 @@ import {
   runTotals,
   epfDueDate,
   daysUntil,
-  loanOutstanding,
-  isLoanActive,
   toLocalDateStr
 } from '../payrollUtils';
 import Employees from './Employees';
 import Payroll from './Payroll';
 import Attendance from './Attendance';
-import Loans from './Loans';
 import PayrollReports from './PayrollReports';
 import PayrollSettings from './PayrollSettings';
 
@@ -38,7 +34,6 @@ const TABS = [
   { key: 'employees', label: 'Employees', icon: Users },
   { key: 'payroll', label: 'Payroll', icon: Banknote },
   { key: 'attendance', label: 'Attendance & leave', icon: CalendarCheck },
-  { key: 'loans', label: 'Loans & advances', icon: HandCoins },
   { key: 'reports', label: 'Reports', icon: FileBarChart },
   { key: 'settings', label: 'Settings', icon: Settings2 }
 ];
@@ -126,9 +121,6 @@ export default function HrPayroll({
   const thisMonthRuns = hr.runs.filter(r => r.month === thisMonth);
   const activeCount = hr.employees.filter(e => e.status === 'Active').length;
   const netThisMonth = thisMonthRuns.reduce((s, r) => s + runTotals(r).net, 0);
-  const outstandingLoans = hr.loans
-    .filter(isLoanActive)
-    .reduce((s, l) => s + loanOutstanding(l, hr.repayments, hr.runs), 0);
   const lastMonthEmployer = hr.runs
     .filter(r => r.month === lastMonth)
     .reduce((s, r) => s + (Number(r.epf_employee) || 0) + (Number(r.epf_employer) || 0) + (Number(r.etf_employer) || 0), 0);
@@ -138,8 +130,6 @@ export default function HrPayroll({
     salaries: hr.salaries,
     marks: hr.marks,
     runs: hr.runs,
-    loans: hr.loans,
-    repayments: hr.repayments,
     settings: hr.settings,
     timeLogs,
     currentUserProfile,
@@ -187,10 +177,6 @@ export default function HrPayroll({
               <div style={s.cardLabel}>EPF + ETF for {monthLabel(lastMonth)}</div>
               <div style={s.cardValue}>{lastMonthEmployer ? `LKR ${formatMoney(lastMonthEmployer)}` : '-'}</div>
             </div>
-            <div className="glass-panel" style={s.card}>
-              <div style={s.cardLabel}>Loans outstanding</div>
-              <div style={{ ...s.cardValue, color: outstandingLoans ? '#F59E0B' : 'var(--color-text-primary)' }}>LKR {formatMoney(outstandingLoans)}</div>
-            </div>
           </div>
 
           <div className="glass-panel" style={s.todoPanel}>
@@ -222,7 +208,6 @@ export default function HrPayroll({
       )}
       {tab === 'payroll' && <Payroll {...shared} />}
       {tab === 'attendance' && <Attendance {...shared} onRefreshData={onRefreshData} />}
-      {tab === 'loans' && <Loans {...shared} />}
       {tab === 'reports' && <PayrollReports employees={hr.employees} runs={hr.runs} settings={hr.settings} />}
       {tab === 'settings' && <PayrollSettings key={hr.settingsRow?.id || 'defaults'} settings={hr.settings} onReload={hr.reload} />}
     </div>

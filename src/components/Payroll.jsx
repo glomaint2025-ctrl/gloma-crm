@@ -41,8 +41,6 @@ export default function Payroll({
   salaries = [],
   marks = [],
   runs = [],
-  loans = [],
-  repayments = [],
   settings,
   timeLogs = [],
   currentUserProfile = {},
@@ -74,14 +72,13 @@ export default function Payroll({
     const run = runs.find(r => r.month === month && r.employee_id === employee.id) || null;
     const auto = salary
       ? computePayroll({
-          employee, salary, settings, monthKey: month, timeLogs, marks, loans, repayments, runs,
-          excludeRunId: run ? run.id : null, today
+          employee, salary, settings, monthKey: month, timeLogs, marks, today
         })
       : null;
     const stale = !!(run && auto && run.status === 'Draft' &&
       AUTO_RUN_KEYS.some(key => Math.abs((Number(run[key]) || 0) - (Number(auto[key]) || 0)) > 0.005));
     return { employee, salary, run, auto, stale };
-  }), [payrollEmployees, salaries, runs, marks, timeLogs, loans, repayments, settings, month, today]);
+  }), [payrollEmployees, salaries, runs, marks, timeLogs, settings, month, today]);
 
   const monthRuns = runs.filter(r => r.month === month);
   const sums = monthRuns.reduce((acc, r) => {
@@ -149,19 +146,8 @@ export default function Payroll({
     };
   };
 
-  // Keep the loan repayment rows of a payslip in step with what it deducts.
-  const syncLoanRepayments = async (runId, details) => {
-    await supabase.from('loan_repayments').delete().eq('run_id', runId);
-    if (details.length) {
-      await supabase.from('loan_repayments').insert(
-        details.map(d => ({ loan_id: d.loan_id, run_id: runId, month, amount: d.amount }))
-      );
-    }
-  };
-
   const saveRunFor = async (row, status = 'Draft') => {
     const payload = buildRunPayload(row, row.run);
-    let runId = row.run ? row.run.id : null;
     let error;
     if (row.run) {
       ({ error } = await supabase.from('payroll_runs').update(payload).eq('id', row.run.id));
@@ -172,9 +158,7 @@ export default function Payroll({
         .select()
         .single();
       error = res.error;
-      runId = res.data ? res.data.id : null;
     }
-    if (!error && runId) await syncLoanRepayments(runId, row.auto.loan_details);
     return error;
   };
 
@@ -204,7 +188,7 @@ export default function Payroll({
     const proceed = confirm(
       `Delete ${resettable.length} unpaid payslip(s) for ${monthLabel(month)}?` +
       (keptPaid ? ` ${keptPaid} paid payslip(s) will be kept.` : '') +
-      ' Manual additions, deductions and notes on them are lost, and loan instalments on them are released. Salaries are not affected.'
+      ' Manual additions, deductions and notes on them are lost,. Salaries are not affected.'
     );
     if (!proceed) return;
     setBusy(true);
@@ -224,7 +208,7 @@ export default function Payroll({
       );
       if (!proceed) return false;
     }
-    // Finalizing re-reads attendance, salary and loans so the payslip is current.
+    // Finalizing re-reads attendance and salary so the payslip is current.
     const payload = finalizing && auto ? buildRunPayload(row, run) : {};
     const { error } = await supabase.from('payroll_runs').update({
       ...payload,
@@ -232,7 +216,6 @@ export default function Payroll({
       paid_date: nextStatus === 'Paid' ? today : null,
       updated_at: new Date().toISOString()
     }).eq('id', run.id);
-    if (!error && finalizing && auto) await syncLoanRepayments(run.id, auto.loan_details);
     if (error) alert(`Could not update payslip: ${error.message}`);
     return !error;
   };

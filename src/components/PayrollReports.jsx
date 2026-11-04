@@ -50,16 +50,18 @@ export default function PayrollReports({ employees = [], runs = [], settings }) 
     [runs, month]
   );
   const settledRuns = monthRuns.filter(r => r.status === 'Finalized' || r.status === 'Paid');
+  // Loans were removed from payroll; the column only appears for older months that still carry one.
+  const showLoan = monthRuns.some(r => Number(r.loan_deduction) > 0);
   const total = (list, pick) => round2(list.reduce((acc, r) => acc + (Number(pick(r)) || 0), 0));
 
   const exportRegister = () => downloadCsv(`payroll-register-${month}.csv`, [
-    ['Employee', 'Designation', 'Basic', 'Allowances', 'OT hours', 'OT pay', 'Additions', 'Gross', 'No-pay deduction', 'EPF employee', 'APIT', 'Loan', 'Other deductions', 'Total deductions', 'Net pay', 'Employer EPF', 'Employer ETF', 'Status'],
+    ['Employee', 'Designation', 'Basic', 'Allowances', 'OT hours', 'OT pay', 'Additions', 'Gross', 'No-pay deduction', 'EPF employee', 'APIT', ...(showLoan ? ['Loan'] : []), 'Other deductions', 'Total deductions', 'Net pay', 'Employer EPF', 'Employer ETF', 'Status'],
     ...monthRuns.map(r => {
       const t = runTotals(r);
       return [
         r.employee_name, employeeOf(r.employee_id).designation || '', r.basic_salary,
         allowanceItems(r).reduce((acc, a) => acc + a.amount, 0), r.ot_hours, r.ot_amount, sumList(r.additions),
-        t.gross, r.no_pay_deduction, r.epf_employee || 0, r.apit || 0, r.loan_deduction || 0, sumList(r.deductions),
+        t.gross, r.no_pay_deduction, r.epf_employee || 0, r.apit || 0, ...(showLoan ? [r.loan_deduction || 0] : []), sumList(r.deductions),
         t.totalDeductions, t.net, r.epf_employer || 0, r.etf_employer || 0, r.status
       ];
     })
@@ -152,7 +154,7 @@ export default function PayrollReports({ employees = [], runs = [], settings }) 
                     <th style={{ textAlign: 'right' }}>Gross</th>
                     <th style={{ textAlign: 'right' }}>EPF employee</th>
                     <th style={{ textAlign: 'right' }}>APIT</th>
-                    <th style={{ textAlign: 'right' }}>Loan</th>
+                    {showLoan && <th style={{ textAlign: 'right' }}>Loan</th>}
                     <th style={{ textAlign: 'right' }}>Total deductions</th>
                     <th style={{ textAlign: 'right' }}>Net pay</th>
                     <th>Status</th>
@@ -167,21 +169,21 @@ export default function PayrollReports({ employees = [], runs = [], settings }) 
                         {right(formatMoney(t.gross))}
                         {right(formatMoney(r.epf_employee))}
                         {right(formatMoney(r.apit))}
-                        {right(formatMoney(r.loan_deduction))}
+                        {showLoan && right(formatMoney(r.loan_deduction))}
                         {right(formatMoney(t.totalDeductions))}
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatMoney(t.net)}</td>
                         <td>{r.status}</td>
                       </tr>
                     );
                   })}
-                  {monthRuns.length === 0 && <tr><td colSpan={8} style={s.empty}>No payslips for this month.</td></tr>}
+                  {monthRuns.length === 0 && <tr><td colSpan={showLoan ? 8 : 7} style={s.empty}>No payslips for this month.</td></tr>}
                   {monthRuns.length > 0 && (
                     <tr style={{ fontWeight: 800 }}>
                       <td>Total</td>
                       {right(formatMoney(total(monthRuns, r => runTotals(r).gross)))}
                       {right(formatMoney(total(monthRuns, r => r.epf_employee)))}
                       {right(formatMoney(total(monthRuns, r => r.apit)))}
-                      {right(formatMoney(total(monthRuns, r => r.loan_deduction)))}
+                      {showLoan && right(formatMoney(total(monthRuns, r => r.loan_deduction)))}
                       {right(formatMoney(total(monthRuns, r => runTotals(r).totalDeductions)))}
                       {right(formatMoney(total(monthRuns, r => runTotals(r).net)))}
                       <td></td>

@@ -217,35 +217,6 @@ export function leaveUsage(marks, employeeId, year) {
   return usage;
 }
 
-// ---- Loans and salary advances --------------------------------------------------
-// A loan without a status counts as Active (the database default).
-export const isLoanActive = (loan) => (loan.status || 'Active') === 'Active';
-
-// Only repayments that belong to a Finalized/Paid payslip count as repaid.
-export function loanRepaid(loan, repayments, runs, excludeRunId = null) {
-  const settledRuns = new Map(runs.filter(r => r.status === 'Finalized' || r.status === 'Paid').map(r => [r.id, r]));
-  return round2(repayments
-    .filter(rp => rp.loan_id === loan.id && rp.run_id !== excludeRunId && settledRuns.has(rp.run_id))
-    .reduce((sum, rp) => sum + (Number(rp.amount) || 0), 0));
-}
-
-export function loanOutstanding(loan, repayments, runs, excludeRunId = null) {
-  return round2(Math.max(0, (Number(loan.principal) || 0) - loanRepaid(loan, repayments, runs, excludeRunId)));
-}
-
-// Installments due on the payslip for `monthKey` (never more than what is still owed).
-export function loanDeductionsFor({ employeeId, monthKey, loans, repayments, runs, excludeRunId = null }) {
-  const details = [];
-  loans
-    .filter(l => l.employee_id === employeeId && isLoanActive(l) && l.start_month <= monthKey)
-    .forEach(loan => {
-      const outstanding = loanOutstanding(loan, repayments, runs, excludeRunId);
-      const amount = round2(Math.min(Number(loan.installment) || 0, outstanding));
-      if (amount > 0) details.push({ loan_id: loan.id, label: `${loan.loan_type} repayment`, amount });
-    });
-  return { total: round2(details.reduce((s, d) => s + d.amount, 0)), details };
-}
-
 // ---- The automatic part of a payslip ---------------------------------------------
 export function computePayroll({
   employee,
@@ -254,10 +225,6 @@ export function computePayroll({
   monthKey,
   timeLogs = [],
   marks = [],
-  loans = [],
-  repayments = [],
-  runs = [],
-  excludeRunId = null,
   today = toLocalDateStr()
 }) {
   const days = buildAttendance({ employee, monthKey, timeLogs, marks, today });
@@ -283,8 +250,6 @@ export function computePayroll({
   const taxableGross = round2(basic - noPayDeduction + allowanceTotal + otAmount);
   const apit = salary?.apit_enabled ? calcApit(taxableGross) : 0;
 
-  const loan = loanDeductionsFor({ employeeId: employee.id, monthKey, loans, repayments, runs, excludeRunId });
-
   return {
     basic_salary: basic,
     fixed_allowance: round2(allowanceTotal),
@@ -298,8 +263,8 @@ export function computePayroll({
     epf_employer: epfEmployer,
     etf_employer: etfEmployer,
     apit,
-    loan_deduction: loan.total,
-    loan_details: loan.details,
+    loan_deduction: 0,
+    loan_details: [],
     unmarkedDays: days.filter(d => d.status === 'Unmarked').length,
     openLogs: days.filter(d => d.hasOpenLog).length
   };

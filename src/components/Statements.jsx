@@ -16,7 +16,7 @@ const groupBy = (items, keyFn) => {
 };
 
 // Everything one statement needs for a period key ('YYYY-MM' or 'YYYY').
-function buildModel({ key, invoices, expenses, runs, tasks, includeTasks, includePayroll }) {
+function buildModel({ key, invoices, incomeEntries, expenses, runs, tasks, includeTasks, includePayroll }) {
   const inPeriod = (date) => String(date || '').startsWith(key);
 
   const invoiceIncome = invoices
@@ -29,7 +29,11 @@ function buildModel({ key, invoices, expenses, runs, tasks, includeTasks, includ
         .map(t => ({ date: String(t.last_updated).substring(0, 10), label: `Website project ${t.id}`, who: t.client_project || '', amount: Number(t.payment_amount), group: 'Website project payments' }))
     : [];
 
-  const income = [...invoiceIncome, ...taskIncome].sort((a, b) => a.date.localeCompare(b.date));
+  const recordedIncome = incomeEntries
+    .filter(e => inPeriod(e.income_date))
+    .map(e => ({ date: String(e.income_date).substring(0, 10), label: e.description || e.client_name || e.category, who: e.client_name || '', amount: Number(e.amount) || 0, group: e.category || 'Other income' }));
+
+  const income = [...invoiceIncome, ...taskIncome, ...recordedIncome].sort((a, b) => a.date.localeCompare(b.date));
 
   const expenseItems = expenses
     .filter(e => inPeriod(e.expense_date))
@@ -81,7 +85,7 @@ function statementHtml({ title, periodLabel, model, monthly }) {
     });
     html += `</tbody></table>`;
   }
-  html += `<p style="margin-top:12px;color:#666;font-size:11px;">Prepared ${esc(formatLongDate(new Date().toISOString().substring(0, 10)))}. Income counts paid invoices (by issue date); expenses are recorded company expenses plus finalized payroll cost.</p>`;
+  html += `<p style="margin-top:12px;color:#666;font-size:11px;">Prepared ${esc(formatLongDate(new Date().toISOString().substring(0, 10)))}. Income counts paid invoices (by issue date) and recorded income; expenses are recorded company expenses plus finalized payroll cost.</p>`;
   return html;
 }
 
@@ -93,6 +97,7 @@ export default function Statements({ tasks = [], currentUserProfile = {} }) {
   const [includePayroll, setIncludePayroll] = useState(true);
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [incomeEntries, setIncomeEntries] = useState([]);
   const [runs, setRuns] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -102,9 +107,10 @@ export default function Statements({ tasks = [], currentUserProfile = {} }) {
   useEffect(() => {
     let active = true;
     (async () => {
-      const [inv, exp, pay] = await Promise.all([
+      const [inv, exp, inc, pay] = await Promise.all([
         supabase.from('invoices').select('*'),
         supabase.from('expenses').select('*'),
+        supabase.from('income_entries').select('*'),
         canSeePayroll ? supabase.from('payroll_runs').select('*') : Promise.resolve({ data: [] })
       ]);
       if (!active) return;
@@ -112,6 +118,8 @@ export default function Statements({ tasks = [], currentUserProfile = {} }) {
       setError(firstError ? firstError.message : '');
       setInvoices(inv.data || []);
       setExpenses(exp.data || []);
+      // Recorded income is optional until supabase_add_income.sql has been run; the Income tab explains that.
+      setIncomeEntries(inc.error ? [] : (inc.data || []));
       setRuns(pay.data || []);
     })();
     return () => { active = false; };
@@ -119,12 +127,12 @@ export default function Statements({ tasks = [], currentUserProfile = {} }) {
 
   const key = mode === 'month' ? month : year;
   const periodLabel = mode === 'month' ? monthLabel(month) : `Year ${year}`;
-  const common = { invoices, expenses, runs, tasks, includeTasks, includePayroll: includePayroll && canSeePayroll };
+  const common = { invoices, incomeEntries, expenses, runs, tasks, includeTasks, includePayroll: includePayroll && canSeePayroll };
 
   const model = useMemo(
     () => buildModel({ key, ...common }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key, invoices, expenses, runs, tasks, includeTasks, includePayroll, canSeePayroll]
+    [key, invoices, incomeEntries, expenses, runs, tasks, includeTasks, includePayroll, canSeePayroll]
   );
 
   const monthly = useMemo(() => {
@@ -134,7 +142,7 @@ export default function Statements({ tasks = [], currentUserProfile = {} }) {
       return { label: `${name} ${year}`, ...m };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, year, invoices, expenses, runs, tasks, includeTasks, includePayroll, canSeePayroll]);
+  }, [mode, year, invoices, incomeEntries, expenses, runs, tasks, includeTasks, includePayroll, canSeePayroll]);
 
   const title = mode === 'month' ? 'Monthly Income Statement' : 'Annual Income Statement';
 
@@ -281,7 +289,7 @@ export default function Statements({ tasks = [], currentUserProfile = {} }) {
       )}
 
       <div style={s.note}>
-        Income counts <strong>paid invoices</strong> (by issue date){includeTasks ? ' and paid website projects (by last update)' : ''}; expenses are the company expenses you record
+        Income counts <strong>paid invoices</strong> (by issue date), the income you record in the Income tab{includeTasks ? ' and paid website projects (by last update)' : ''}; expenses are the company expenses you record
         {canSeePayroll ? ' plus the cost of finalized payroll (salaries, EPF 12% and ETF 3%)' : ''}. If a website project is also invoiced, untick &ldquo;Include paid website projects&rdquo; to avoid counting it twice.
       </div>
     </div>

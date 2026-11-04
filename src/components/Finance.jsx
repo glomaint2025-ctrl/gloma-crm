@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Wallet, TrendingUp, TrendingDown, CheckCircle2, XCircle, Filter, Pencil, Users, Receipt, Globe, BarChart3 } from 'lucide-react';
 import HrPayroll from './HrPayroll';
 import Expenses from './Expenses';
+import Income from './Income';
 import Statements from './Statements';
 
 const localTranslations = {
   en: {
     title: "Company Finance",
-    subtitle: "Website payments, HR & payroll and company expenses.",
+    subtitle: "Company income and expenses, website payments, and HR & payroll.",
     noAccess: "Only Admin, Manager, Coordinator & Accountant, or Developer accounts can view company finances.",
     totalCollected: "Total Collected",
     totalOutstanding: "Total Outstanding",
@@ -169,8 +170,9 @@ export default function Finance({
       <div style={styles.tabBar}>
         {[
           { key: 'website', label: 'Website payments', icon: Globe, show: true },
-          { key: 'hr', label: 'HR & Payroll', icon: Users, show: canSeePayroll },
+          { key: 'income', label: 'Income', icon: TrendingUp, show: true },
           { key: 'expenses', label: 'Expenses & receipts', icon: Receipt, show: true },
+          { key: 'hr', label: 'HR & Payroll', icon: Users, show: canSeePayroll },
           { key: 'statements', label: 'Statements', icon: BarChart3, show: true }
         ].filter(item => item.show).map(({ key, label, icon: Icon }) => (
           <button
@@ -196,6 +198,7 @@ export default function Finance({
           onRefreshData={onRefreshData}
         />
       )}
+      {tab === 'income' && <Income clients={clients} currentUserProfile={currentUserProfile} />}
       {tab === 'expenses' && <Expenses currentUserProfile={currentUserProfile} />}
       {tab === 'statements' && <Statements tasks={tasks} currentUserProfile={currentUserProfile} />}
 

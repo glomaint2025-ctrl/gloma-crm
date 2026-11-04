@@ -1,7 +1,8 @@
 // Gloma office hours: Mon-Fri 08:30-17:00, Saturday 08:30-15:30, Sunday off.
-// Any time worked past the day's closing time (or on a non-working day) counts
-// as overtime. Used by the Dashboard clock widget, the Work Hours history page,
-// and the Content Calendar's holiday overlay.
+// Overtime is opt-in: time past the day's closing time (or on a non-working day) only
+// counts as overtime on a time log that has overtime switched on (time_logs.ot_enabled).
+// Without it, time after closing is simply not counted. Used by the Dashboard clock
+// widget, the Work Hours history page, attendance entry and payroll.
 
 export const OFFICE_OPEN_TIME = '08:30';
 export const WEEKDAY_CLOSE_TIME = '17:00';
@@ -68,20 +69,19 @@ export function getClosingTime(dateStr) {
   return isSaturday(dateStr) ? SATURDAY_CLOSE_TIME : WEEKDAY_CLOSE_TIME;
 }
 
-// Splits a clock-in/out pair into { regularMinutes, overtimeMinutes }, honoring
-// holidays (all overtime) and the Saturday/weekday closing-time split.
-export function splitWorkedMinutes(clockInISO, clockOutISO, workDate) {
+// Splits a clock-in/out pair into { regularMinutes, overtimeMinutes }. Regular time is
+// what falls inside office hours. With otEnabled, everything outside office hours (after
+// closing, or the whole day on a holiday / Sunday) is overtime; without it, that time is
+// not counted at all.
+export function splitWorkedMinutes(clockInISO, clockOutISO, workDate, otEnabled = false) {
   const clockIn = new Date(clockInISO);
   const clockOut = new Date(clockOutISO);
   const totalMinutes = Math.max(0, Math.round((clockOut - clockIn) / 60000));
+  const outsideHours = (minutes) => (otEnabled ? minutes : 0);
 
-  if (isHoliday(workDate)) {
-    return { regularMinutes: 0, overtimeMinutes: totalMinutes };
-  }
-
-  const closing = getClosingTime(workDate);
+  const closing = isHoliday(workDate) ? null : getClosingTime(workDate);
   if (!closing) {
-    return { regularMinutes: 0, overtimeMinutes: totalMinutes };
+    return { regularMinutes: 0, overtimeMinutes: outsideHours(totalMinutes) };
   }
 
   const [ch, cm] = closing.split(':').map(Number);
@@ -92,10 +92,10 @@ export function splitWorkedMinutes(clockInISO, clockOutISO, workDate) {
     return { regularMinutes: totalMinutes, overtimeMinutes: 0 };
   }
   if (clockIn >= closingDate) {
-    return { regularMinutes: 0, overtimeMinutes: totalMinutes };
+    return { regularMinutes: 0, overtimeMinutes: outsideHours(totalMinutes) };
   }
   const regularMinutes = Math.max(0, Math.round((closingDate - clockIn) / 60000));
-  return { regularMinutes, overtimeMinutes: totalMinutes - regularMinutes };
+  return { regularMinutes, overtimeMinutes: outsideHours(totalMinutes - regularMinutes) };
 }
 
 export function formatMinutes(mins) {

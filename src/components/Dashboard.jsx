@@ -102,6 +102,7 @@ export default function Dashboard({
   timeLogs = [],
   onClockIn,
   onClockOut,
+  onToggleOvertime,
   lang = 'en'
 }) {
   const t = localTranslations[lang] || localTranslations.en;
@@ -123,8 +124,8 @@ export default function Dashboard({
   const activeSessions = timeLogs.filter(l => !l.clock_out);
   const todayHoliday = getHoliday(new Date().toISOString().split('T')[0]);
 
-  // Is a still-running session currently past the day's closing time (or on a holiday)?
-  const isSessionOvertimeNow = (log, nowMs) => {
+  // Is a still-running session currently outside office hours (past closing, or a holiday)?
+  const isSessionAfterHours = (log, nowMs) => {
     if (isHoliday(log.work_date)) return true;
     const closing = getClosingTime(log.work_date);
     if (!closing) return true; // Sunday
@@ -135,10 +136,21 @@ export default function Dashboard({
     return nowMs > closingDate.getTime();
   };
 
+  // Overtime only counts when it has been switched on for the session.
+  const isSessionOvertimeNow = (log, nowMs) => !!log.ot_enabled && isSessionAfterHours(log, nowMs);
+
+  const handleOvertimeSwitch = async () => {
+    if (!myActiveLog || !onToggleOvertime) return;
+    const result = await onToggleOvertime(myActiveLog.id, !myActiveLog.ot_enabled);
+    if (result && result.success === false) alert(result.error || 'Could not change overtime.');
+  };
+
   const myElapsedMinutes = myActiveLog
     ? Math.max(0, Math.floor((time.getTime() - new Date(myActiveLog.clock_in).getTime()) / 60000))
     : 0;
   const myIsOvertimeNow = myActiveLog ? isSessionOvertimeNow(myActiveLog, time.getTime()) : false;
+  const myOvertimeOn = !!(myActiveLog && myActiveLog.ot_enabled);
+  const myUncounted = !!myActiveLog && !myOvertimeOn && isSessionAfterHours(myActiveLog, time.getTime());
 
   // Notifications State
   const [myNotifications, setMyNotifications] = useState([]);
@@ -303,7 +315,7 @@ export default function Dashboard({
           <div>
             <div style={styles.timeClockLabel}>
               {myActiveLog
-                ? (myIsOvertimeNow ? 'Working — OVERTIME' : 'Working since ' + new Date(myActiveLog.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+                ? (myIsOvertimeNow ? 'Working — OVERTIME' : myUncounted ? 'After office hours — not counted' : 'Working since ' + new Date(myActiveLog.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
                 : 'Not clocked in'}
             </div>
             {myActiveLog && (
@@ -311,21 +323,44 @@ export default function Dashboard({
                 {formatMinutes(myElapsedMinutes)} elapsed today
               </div>
             )}
+            {myUncounted && (
+              <div style={styles.timeClockHolidayNote}>
+                Switch Overtime on to count the time you work now.
+              </div>
+            )}
             {!myActiveLog && todayHoliday && (
               <div style={styles.timeClockHolidayNote}>
-                Today is a holiday ({todayHoliday.name}) — hours worked will count as overtime.
+                Today is a holiday ({todayHoliday.name}) — start work, then switch Overtime on to count your hours.
               </div>
             )}
           </div>
         </div>
 
-        <button
-          onClick={() => (myActiveLog ? onClockOut && onClockOut(myActiveLog.id) : onClockIn && onClockIn())}
-          className={myActiveLog ? 'btn-secondary' : 'btn-primary'}
-          style={styles.timeClockBtn}
-        >
-          {myActiveLog ? <><Square size={15} /> Stop Work</> : <><Play size={15} /> Start Work</>}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {myActiveLog && onToggleOvertime && (
+            <button
+              type="button"
+              onClick={handleOvertimeSwitch}
+              className="btn-secondary"
+              title="Turn on when you are working overtime; only then is time after closing counted"
+              style={{
+                ...styles.timeClockBtn,
+                borderColor: myOvertimeOn ? 'rgba(239, 68, 68, 0.6)' : undefined,
+                color: myOvertimeOn ? '#EF4444' : undefined,
+                backgroundColor: myOvertimeOn ? 'rgba(239, 68, 68, 0.12)' : undefined
+              }}
+            >
+              <Timer size={15} /> Overtime: {myOvertimeOn ? 'ON' : 'OFF'}
+            </button>
+          )}
+          <button
+            onClick={() => (myActiveLog ? onClockOut && onClockOut(myActiveLog.id) : onClockIn && onClockIn())}
+            className={myActiveLog ? 'btn-secondary' : 'btn-primary'}
+            style={styles.timeClockBtn}
+          >
+            {myActiveLog ? <><Square size={15} /> Stop Work</> : <><Play size={15} /> Start Work</>}
+          </button>
+        </div>
       </div>
 
       {/* Main KPI Stats Bar */}

@@ -116,6 +116,8 @@ export default function Attendance({
       logId: log ? log.id : null,
       clockIn: log ? timeOf(log.clock_in) : '08:30',
       clockOut: log && log.clock_out ? timeOf(log.clock_out) : '',
+      otEnabled: !!(log && log.ot_enabled),
+      hadOtFlag: !!(log && log.ot_enabled !== undefined && log.ot_enabled !== null),
       extraLogs: Math.max(0, day.logs.length - 1)
     });
   };
@@ -135,7 +137,7 @@ export default function Attendance({
         setFormError('End time must be after the start time.');
         return;
       }
-      split = splitWorkedMinutes(clockInISO, clockOutISO, timeForm.date);
+      split = splitWorkedMinutes(clockInISO, clockOutISO, timeForm.date, timeForm.otEnabled);
     }
 
     const fields = {
@@ -144,7 +146,9 @@ export default function Attendance({
       regular_minutes: split.regularMinutes,
       overtime_minutes: split.overtimeMinutes,
       is_holiday: isHoliday(timeForm.date),
-      auto_closed: false
+      auto_closed: false,
+      // Only sent when it matters, so saving works before the ot_enabled column exists.
+      ...(timeForm.otEnabled || timeForm.hadOtFlag ? { ot_enabled: timeForm.otEnabled } : {})
     };
 
     const { error } = timeForm.logId
@@ -316,6 +320,10 @@ export default function Attendance({
                   <input type="time" className="form-input" value={timeForm.clockOut} onChange={(e) => setTimeForm({ ...timeForm, clockOut: e.target.value })} />
                 </div>
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-sm)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={timeForm.otEnabled} onChange={(e) => setTimeForm({ ...timeForm, otEnabled: e.target.checked })} />
+                Overtime worked (counts time after closing, or the whole day on a Sunday / holiday)
+              </label>
               {formError && <div style={s.formError}>{formError}</div>}
               <div style={{ ...s.modalActions, justifyContent: 'space-between' }}>
                 {timeForm.logId ? (

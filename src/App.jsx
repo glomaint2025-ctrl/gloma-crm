@@ -242,7 +242,7 @@ export default function App() {
           const clockIn = new Date(log.clock_in);
           let closeAt = new Date(localISO(log.work_date, getClosingTime(log.work_date) || '17:00'));
           if (closeAt < clockIn) closeAt = clockIn;
-          const split = splitWorkedMinutes(log.clock_in, closeAt.toISOString(), log.work_date);
+          const split = splitWorkedMinutes(log.clock_in, closeAt.toISOString(), log.work_date, !!log.ot_enabled);
           await supabase.from('time_logs').update({
             clock_out: closeAt.toISOString(),
             regular_minutes: split.regularMinutes,
@@ -872,7 +872,7 @@ export default function App() {
 
     let clockOutISO = typeof atISO === 'string' ? atISO : new Date().toISOString();
     if (new Date(clockOutISO) < new Date(log.clock_in)) clockOutISO = log.clock_in;
-    const { regularMinutes, overtimeMinutes } = splitWorkedMinutes(log.clock_in, clockOutISO, log.work_date);
+    const { regularMinutes, overtimeMinutes } = splitWorkedMinutes(log.clock_in, clockOutISO, log.work_date, !!log.ot_enabled);
 
     try {
       await supabase
@@ -887,6 +887,25 @@ export default function App() {
       await refreshData();
     } catch (err) {
       console.error('Clock-out failed:', err);
+    }
+  };
+
+  // Overtime is opt-in: the employee (or HR) switches it on for a session, and only then
+  // does time past closing count. The ot_enabled flag is read when the session is closed.
+  const handleToggleOvertime = async (logId, enabled) => {
+    try {
+      const { error } = await supabase.from('time_logs').update({ ot_enabled: !!enabled }).eq('id', logId);
+      if (error) throw error;
+      await refreshData();
+      return { success: true };
+    } catch (err) {
+      console.error('Overtime toggle failed:', err);
+      return {
+        success: false,
+        error: /ot_enabled|schema cache|column/i.test(err?.message || '')
+          ? 'Overtime is not set up in the database yet. Run supabase_add_ot_toggle.sql in the Supabase SQL Editor.'
+          : err?.message
+      };
     }
   };
 
@@ -1144,6 +1163,7 @@ export default function App() {
             timeLogs={timeLogs}
             onClockIn={handleClockIn}
             onClockOut={handleClockOut}
+            onToggleOvertime={handleToggleOvertime}
             lang={lang}
           />
         )}

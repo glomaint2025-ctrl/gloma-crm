@@ -158,6 +158,7 @@ export default function AttendanceMark({ timeLogs = [], currentUserProfile = {},
       skipNonWorking: true,
       clockIn: '',
       clockOut: '',
+      otEnabled: false,
       notes: ''
     });
   };
@@ -203,7 +204,7 @@ export default function AttendanceMark({ timeLogs = [], currentUserProfile = {},
       const clockInISO = toISO(date, addForm.clockIn);
       const clockOutISO = addForm.clockOut ? toISO(date, addForm.clockOut) : null;
       const split = clockOutISO
-        ? splitWorkedMinutes(clockInISO, clockOutISO, date)
+        ? splitWorkedMinutes(clockInISO, clockOutISO, date, addForm.otEnabled)
         : { regularMinutes: null, overtimeMinutes: null };
       const { error } = await supabase.from('time_logs').insert({
         user_id: employee.profile_id,
@@ -214,7 +215,9 @@ export default function AttendanceMark({ timeLogs = [], currentUserProfile = {},
         regular_minutes: split.regularMinutes,
         overtime_minutes: split.overtimeMinutes,
         is_holiday: isHoliday(date),
-        source: 'manual'
+        source: 'manual',
+        // Only sent when switched on, so saving works before the ot_enabled column exists.
+        ...(addForm.otEnabled ? { ot_enabled: true } : {})
       });
       if (error) {
         setSaving(false);
@@ -517,6 +520,12 @@ export default function AttendanceMark({ timeLogs = [], currentUserProfile = {},
                     />
                   </div>
                 </div>
+              )}
+              {addForm.from === addForm.to && addEmployee?.profile_id && addForm.clockIn && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-sm)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={addForm.otEnabled} onChange={(e) => setAddForm({ ...addForm, otEnabled: e.target.checked })} />
+                  Overtime worked (counts time after closing, or the whole day on a Sunday / holiday)
+                </label>
               )}
               <div>
                 <label style={s.label}>Note (optional)</label>
