@@ -113,7 +113,8 @@ export default function Expenses({ currentUserProfile = {} }) {
       setForm(blankForm());
       await load();
     } catch (err) {
-      setFormError(`Could not save the expense: ${err.message}`);
+      const needsSetup = /schema cache|does not exist/i.test(err.message || '');
+      setFormError(`Could not save the expense: ${err.message}${needsSetup ? '. Run supabase_setup_everything.sql in the Supabase SQL Editor (the live project), then try again.' : ''}`);
     } finally {
       setSaving(false);
     }

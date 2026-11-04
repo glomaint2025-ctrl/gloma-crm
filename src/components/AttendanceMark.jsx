@@ -108,7 +108,7 @@ export default function AttendanceMark({ timeLogs = [], currentUserProfile = {},
     if (error) {
       setMessage(
         /row-level security|policy|permission/i.test(error.message)
-          ? 'Self-marking is not enabled yet. Ask the admin to run supabase_add_self_attendance.sql in Supabase.'
+          ? 'Self-marking is not enabled yet. Ask the admin to run supabase_setup_everything.sql in Supabase.'
           : `Could not mark attendance: ${error.message}`
       );
     }

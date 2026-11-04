@@ -126,7 +126,7 @@ const guardDeveloperRole = (role, email) => {
 // content columns with "Could not find the 'caption' column ...": say what to do about it.
 const contentSaveError = (err) => (
   /column|schema cache/i.test(err?.message || '') && CONTENT_FIELD_RE.test(err.message)
-    ? 'Content fields are not set up in the database yet. Run supabase_add_content_calendar_fields.sql in the Supabase SQL Editor, then try again.'
+    ? 'Content fields are not set up in the database yet. Run supabase_setup_everything.sql in the Supabase SQL Editor, then try again.'
     : err?.message
 );
 
@@ -623,7 +623,7 @@ export default function App() {
       return {
         success: false,
         error: /set_gemini_key|schema cache|could not find the function/i.test(detail)
-          ? `The database is not set up for the Gemini key yet. Run supabase_secure_gemini_key.sql in the Supabase SQL Editor, then try again. (${detail})`
+          ? `The database is not set up for the Gemini key yet. Run supabase_setup_everything.sql in the Supabase SQL Editor, then try again. (${detail})`
           : `Could not save the key: ${detail}`
       };
     }
@@ -903,7 +903,7 @@ export default function App() {
       return {
         success: false,
         error: /ot_enabled|schema cache|column/i.test(err?.message || '')
-          ? 'Overtime is not set up in the database yet. Run supabase_add_ot_toggle.sql in the Supabase SQL Editor.'
+          ? 'Overtime is not set up in the database yet. Run supabase_setup_everything.sql in the Supabase SQL Editor.'
           : err?.message
       };
     }

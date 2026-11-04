@@ -134,7 +134,7 @@ export default function WorkHours({
       const { data, error } = await supabase.rpc('dev_reset_hours', { target_user: resetTarget.id, kind });
       if (error) {
         failure = /dev_reset_hours|schema cache|could not find the function/i.test(error.message || '')
-          ? 'The database is not set up for resets yet. Run supabase_dev_reset_hours.sql in the Supabase SQL Editor, then try again.'
+          ? 'The database is not set up for resets yet. Run supabase_setup_everything.sql in the Supabase SQL Editor, then try again.'
           : error.message;
       } else if (!data) {
         failure = 'Nothing was changed.';

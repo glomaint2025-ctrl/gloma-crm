@@ -110,7 +110,8 @@ export default function Income({ clients = [], currentUserProfile = {} }) {
       setForm(blankForm());
       await load();
     } catch (err) {
-      setFormError(`Could not save the income: ${err.message}`);
+      const needsSetup = /schema cache|does not exist/i.test(err.message || '');
+      setFormError(`Could not save the income: ${err.message}${needsSetup ? '. Run supabase_setup_everything.sql in the Supabase SQL Editor (the live project), then try again.' : ''}`);
     } finally {
       setSaving(false);
     }
@@ -164,7 +165,7 @@ export default function Income({ clients = [], currentUserProfile = {} }) {
         <div className="glass-panel" style={s.warning}>
           <AlertTriangle size={18} color="#F59E0B" />
           <span>
-            Could not load income ({loadError}). Run <strong>supabase_add_income.sql</strong> in the Supabase SQL Editor.
+            Could not load income ({loadError}). Run <strong>supabase_setup_everything.sql</strong> in the Supabase SQL Editor.
           </span>
         </div>
       )}

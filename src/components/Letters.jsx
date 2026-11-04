@@ -235,7 +235,7 @@ export default function Letters({ currentUserProfile = {} }) {
       setStatus('Saved.');
       await loadLetters();
     } catch (err) {
-      setStatus(`Could not save: ${err.message}. Run supabase_add_letters.sql in the Supabase SQL Editor.`);
+      setStatus(`Could not save: ${err.message}. Run supabase_setup_everything.sql in the Supabase SQL Editor.`);
     } finally {
       setBusy('');
     }
@@ -341,7 +341,7 @@ export default function Letters({ currentUserProfile = {} }) {
       {loadError && (
         <div className="glass-panel" style={s.warning}>
           <AlertTriangle size={18} color="#F59E0B" />
-          <span>Saved letters could not be loaded ({loadError}). Run <strong>supabase_add_letters.sql</strong> in the Supabase SQL Editor. You can still write, download and print letters.</span>
+          <span>Saved letters could not be loaded ({loadError}). Run <strong>supabase_setup_everything.sql</strong> in the Supabase SQL Editor. You can still write, download and print letters.</span>
         </div>
       )}
 
