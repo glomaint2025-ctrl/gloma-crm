@@ -549,14 +549,16 @@ export default function Payroll({
                 {allowanceItems(runForm.row.run).map((a, i) => (
                   <div key={i}>{a.label}: <strong>{formatMoney(a.amount)}</strong></div>
                 ))}
-                <div>Overtime: <strong>{runForm.row.run.ot_hours} h = {formatMoney(runForm.row.run.ot_amount)}</strong></div>
+                {Number(runForm.row.run.ot_amount) > 0 && (
+                  <div>Overtime: <strong>{runForm.row.run.ot_hours} h = {formatMoney(runForm.row.run.ot_amount)}</strong></div>
+                )}
                 <div>No-pay: <strong>{runForm.row.run.no_pay_days} day(s) = -{formatMoney(runForm.row.run.no_pay_deduction)}</strong></div>
                 {Number(runForm.row.run.epf_employee) > 0 && <div>EPF {settings.epf_employee_rate}%: <strong>-{formatMoney(runForm.row.run.epf_employee)}</strong></div>}
                 {Number(runForm.row.run.apit) > 0 && <div>APIT: <strong>-{formatMoney(runForm.row.run.apit)}</strong></div>}
                 {Number(runForm.row.run.loan_deduction) > 0 && <div>Loan / advance: <strong>-{formatMoney(runForm.row.run.loan_deduction)}</strong></div>}
               </div>
 
-              {[['additions', 'Additions (bonus, commission, reimbursements...)'], ['deductions', 'Other deductions (fines, welfare, other...)']].map(([listKey, title]) => (
+              {[['additions', 'Additions (overtime, bonus, commission, reimbursements...)'], ['deductions', 'Other deductions (fines, welfare, other...)']].map(([listKey, title]) => (
                 <div key={listKey}>
                   <div style={s.sectionLabel}>{title}</div>
                   {runForm[listKey].map((line, index) => (

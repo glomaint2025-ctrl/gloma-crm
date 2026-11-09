@@ -1,7 +1,6 @@
 import React from 'react';
 import { COMPANY_PROFILE, amountInWords } from '../invoiceUtils';
-import { runTotals, monthLabel, allowanceItems, daysInMonthKey, DEFAULT_PAYROLL_SETTINGS } from '../payrollUtils';
-import { isHoliday } from '../workHours';
+import { runTotals, monthLabel, allowanceItems, workingDaysInMonth, DEFAULT_PAYROLL_SETTINGS } from '../payrollUtils';
 
 // Print-ready payslip on HALF of an A4 sheet (794 x 561 px at 96 dpi): the top half of the
 // page, so two payslips can be cut from one sheet. Fixed colours so it prints identically in
@@ -17,13 +16,13 @@ const fmt = (value) => {
   return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}${dec ? `.${dec}` : ''}`;
 };
 
-// Working days in the month (Mon-Sat, excluding Sundays and Poya days) less unpaid days.
+// Working days in the month (Mon-Sat, excluding Sundays and Poya days; October 2026 is a fixed
+// 25) less unpaid days.
 const workedDays = (run) => {
   if (Number.isFinite(Number(run.worked_days)) && run.worked_days !== null && run.worked_days !== undefined) {
     return Number(run.worked_days);
   }
-  const working = daysInMonthKey(run.month).filter(d => !isHoliday(d)).length;
-  return Math.max(0, working - (Number(run.no_pay_days) || 0));
+  return Math.max(0, workingDaysInMonth(run.month) - (Number(run.no_pay_days) || 0));
 };
 
 export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL_SETTINGS }) {

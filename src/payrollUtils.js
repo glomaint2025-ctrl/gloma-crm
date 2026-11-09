@@ -3,7 +3,8 @@ import { isHoliday, getHoliday, getClosingTime } from './workHours';
 // ---- Default payroll rules ------------------------------------------------------
 // Editable from HR & Payroll -> Settings (stored in payroll_settings). These defaults
 // follow the common Sri Lankan setup:
-//  - Overtime: hours x 1.5 x (basic / 240), on every overtime minute (Sundays and Poya days too).
+//  - Overtime: not calculated; HR adds it by hand as an Addition on the payslip when it is owed.
+//    (ot_multiplier / ot_hourly_divisor are kept for the Settings screen and older payslips.)
 //  - No-pay day: basic / 30.
 //  - EPF 8% employee + 12% employer, ETF 3% employer, on "total earnings", which exclude
 //    overtime, incentives/bonuses and reimbursements. Mark each allowance as EPF-able or not.
@@ -31,6 +32,16 @@ export function resolveSettings(row) {
     merged.id = row.id;
   }
   return merged;
+}
+
+// Months whose pay is based on a fixed number of working days instead of the calendar count
+// (Mon-Sat less Sundays and Poya days). October 2026 is paid as a 25-day month.
+const WORKING_DAYS_OVERRIDE = { '2026-10': 25 };
+
+// Working days the payslip's "Worked Days" starts from, before unpaid days are taken off.
+export function workingDaysInMonth(monthKey) {
+  if (WORKING_DAYS_OVERRIDE[monthKey] !== undefined) return WORKING_DAYS_OVERRIDE[monthKey];
+  return daysInMonthKey(monthKey).filter(d => !isHoliday(d)).length;
 }
 
 export const ATTENDANCE_STATUSES = [
@@ -235,8 +246,10 @@ export function computePayroll({
   const noPayDays = days.reduce((sum, d) => sum + (d.isWorkingDay ? (NO_PAY_WEIGHT[d.status] || 0) : 0), 0);
   const noPayDeduction = round2((basic / settings.no_pay_divisor) * noPayDays);
 
-  const otHours = round2(days.reduce((sum, d) => sum + d.overtimeMinutes, 0) / 60);
-  const otAmount = round2(otHours * hourlyRate(basic, settings) * settings.ot_multiplier);
+  // Overtime is not paid automatically. When it is owed, HR adds it by hand as an "Addition"
+  // on the payslip, so the clock's overtime minutes never reach pay.
+  const otHours = 0;
+  const otAmount = 0;
 
   // EPF/ETF base: basic (less unpaid days) plus the allowances flagged EPF-able; never overtime.
   const epfBase = round2(Math.max(0, basic - noPayDeduction + allowances.filter(a => a.epf).reduce((s, a) => s + a.amount, 0)));
