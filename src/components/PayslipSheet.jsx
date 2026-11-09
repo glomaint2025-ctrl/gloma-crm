@@ -60,7 +60,7 @@ export default function PayslipSheet({ run, employee, settings = DEFAULT_PAYROLL
     <div style={s.sheet} data-pdf-noframe="true" data-pdf-body="true">
       <div style={s.title}>Payslip</div>
       <div style={s.company}>{COMPANY_PROFILE.name}</div>
-      <div style={s.empId}>Employee ID : {employee?.epf_no || employee?.nic || '-'}</div>
+      <div style={s.empId}>Employee ID : {employee?.employee_code || employee?.epf_no || employee?.nic || '-'}</div>
 
       <div style={s.meta}>
         <div style={s.metaCol}>

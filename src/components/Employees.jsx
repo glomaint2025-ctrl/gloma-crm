@@ -44,6 +44,8 @@ const blankLine = () => ({ label: '', amount: '', epf: false });
 const blankForm = (settings) => ({
   id: null,
   profile_id: null,
+  employee_code: '',
+  saved_employee_code: '',
   full_name: '',
   nic: '',
   date_of_birth: '',
@@ -112,6 +114,7 @@ export default function Employees({
   const [docForm, setDocForm] = useState({ doc_type: DOC_TYPES[0], file: null });
   const [accountForm, setAccountForm] = useState(null);
   const [linkChoice, setLinkChoice] = useState('');
+  const [codeUnlocked, setCodeUnlocked] = useState(false);
 
   const salaryOf = (employeeId) => salaries.find(sal => sal.employee_id === employeeId) || null;
   const profileOf = (profileId) => profiles.find(p => p.id === profileId) || null;
@@ -120,7 +123,7 @@ export default function Employees({
     const q = searchQuery.trim().toLowerCase();
     return employees
       .filter(e => !statusFilter || e.status === statusFilter)
-      .filter(e => !q || [e.full_name, e.designation, e.department, e.nic, e.phone, e.email]
+      .filter(e => !q || [e.full_name, e.employee_code, e.designation, e.department, e.nic, e.phone, e.email]
         .map(v => (v || '').toLowerCase()).join(' ').includes(q));
   }, [employees, searchQuery, statusFilter]);
 
@@ -141,6 +144,7 @@ export default function Employees({
     setFormError('');
     setDocuments([]);
     setAccountForm(null);
+    setCodeUnlocked(false);
     setForm(blankForm(settings));
   };
 
@@ -150,11 +154,14 @@ export default function Employees({
     setFormError('');
     setAccountForm(null);
     setLinkChoice('');
+    setCodeUnlocked(false);
     setForm({
       ...blankForm(settings),
       ...Object.fromEntries(EMPLOYEE_COLUMNS.map(col => [col, employee[col] === null || employee[col] === undefined ? '' : String(employee[col])])),
       id: employee.id,
       profile_id: employee.profile_id,
+      employee_code: employee.employee_code || '',
+      saved_employee_code: employee.employee_code || '',
       basic_salary: salary ? String(salary.basic_salary) : '',
       allowances: items.length ? items.map(a => ({ label: a.label, amount: String(a.amount), epf: a.epf })) : [blankLine()],
       epf_enabled: salary ? !!salary.epf_enabled : !!settings?.default_epf_enabled,
@@ -202,6 +209,9 @@ export default function Employees({
       payload.end_date = null;
       payload.end_reason = null;
     }
+    // Only sent when there is an ID to save or clear, so saving still works before the column exists.
+    const employeeCode = form.employee_code.trim();
+    if (employeeCode || form.saved_employee_code) payload.employee_code = employeeCode || null;
 
     setSaving(true);
     let employeeId = form.id;
@@ -236,13 +246,21 @@ export default function Employees({
 
     setSaving(false);
     if (error) {
-      setFormError(`Could not save: ${error.message}`);
+      const message = error.message || '';
+      if (/employee_code/i.test(message) && /duplicate|unique/i.test(message)) {
+        setFormError(`Employee ID "${employeeCode}" is already used by another employee. Choose a different one.`);
+      } else if (/employee_code/i.test(message)) {
+        setFormError('The database is not set up for Employee IDs yet. Run supabase_add_employee_code.sql in the Supabase SQL Editor, then try again.');
+      } else {
+        setFormError(`Could not save: ${message}`);
+      }
       return;
     }
     await onReload();
     // Keep the modal open after creating so documents/login can be added right away.
     if (!form.id && employeeId) {
-      setForm(prev => ({ ...prev, id: employeeId }));
+      setCodeUnlocked(false);
+      setForm(prev => ({ ...prev, id: employeeId, saved_employee_code: employeeCode }));
     } else {
       setForm(null);
     }
@@ -444,6 +462,7 @@ export default function Employees({
                   <tr key={emp.id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{emp.full_name}</div>
+                      {emp.employee_code && <div style={{ ...s.subText, color: 'var(--color-gold)' }}>ID: {emp.employee_code}</div>}
                       <div style={s.subText}>{[emp.designation, emp.department].filter(Boolean).join(' - ') || emp.employment_type}</div>
                       {probationDays !== null && probationDays >= 0 && probationDays <= 30 && (
                         <div style={{ ...s.subText, color: '#F59E0B' }}>Probation ends in {probationDays} day(s)</div>
@@ -520,6 +539,37 @@ export default function Employees({
 
             <form onSubmit={handleSave} style={s.form}>
               <div style={s.section}>Personal details</div>
+              <div style={s.row}>
+                <Field label="Employee ID">
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      className="form-input"
+                      style={{ flex: 1 }}
+                      placeholder="e.g. GLM-001"
+                      value={form.employee_code}
+                      readOnly={!!form.saved_employee_code && !codeUnlocked}
+                      onChange={(e) => setField('employee_code', e.target.value)}
+                    />
+                    {!!form.saved_employee_code && !codeUnlocked && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={s.smallBtn}
+                        onClick={() => {
+                          if (confirm(`Change Employee ID ${form.saved_employee_code}? It is printed on payslips, so only change it if it was entered wrongly.`)) setCodeUnlocked(true);
+                        }}
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
+                  <div style={s.hint}>
+                    {form.saved_employee_code && !codeUnlocked
+                      ? 'Saved. It stays the same until you press Change.'
+                      : 'Type it once; it is kept as entered and printed on the payslip.'}
+                  </div>
+                </Field>
+              </div>
               <div style={s.row}>
                 <Field label="Full name *" wide>
                   <input className="form-input" required value={form.full_name} onChange={(e) => setField('full_name', e.target.value)} />
